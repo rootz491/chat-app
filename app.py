@@ -9,10 +9,11 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from dotenv import load_dotenv
+import database
 
 
 # Import flask login
-from flask_login import LoginManager, UserMixin
+from flask_login import LoginManager, UserMixin, login_required, current_user
 
 # Load the configuration file
 load_dotenv('config.env')
@@ -49,6 +50,9 @@ db.init_app(app)
 
 # Define the User and Message models
 class User(db.Model, UserMixin):
+    __tablename__ = 'users'  # DB table if doesnt exist
+    __table_args__ = {'extend_existing': True}  # This will create the table if it doesn't exist
+
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(100), unique=True, nullable=False)
     password = db.Column(db.String(150), nullable=False)
@@ -62,15 +66,17 @@ class User(db.Model, UserMixin):
         return argon2.verify(self.password, password)
 
 class Message(db.Model):
+    __tablename__ = 'messages'  # DB TABLE
+    __table_args__ = {'extend_existing': True}  # This will create the table if it doesn't exist
+
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
     user = db.relationship('User', backref=db.backref('messages', lazy=True))
     message = db.Column(db.String(80), nullable=False)
 
-
+# Create the tables in the database
 with app.app_context():
-    # Create the tables in the database
-    db.create_all()
+    database.db.create_all()
 
 
 # Initialize the login manager
@@ -84,7 +90,7 @@ def load_user(user_id):
     with pool.getconn() as conn:
         # Query the database for the user
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM user WHERE id = %s", (user_id,))
+        cursor.execute("SELECT * FROM users WHERE id = %s", (user_id,))
         row = cursor.fetchone()
         if row is not None:
             # Create a user object
@@ -162,7 +168,7 @@ def login():
         # Validate the login
         with pool.getconn() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM user WHERE username = %s", (username,))
+            cursor.execute("SELECT * FROM users WHERE username = %s", (username,))
             row = cursor.fetchone()
             if row is None:
                 return render_template('login.html', error='Invalid username or password')
@@ -185,8 +191,13 @@ def login():
         return render_template('login.html')
 
 @app.route('/messages', methods=['GET', 'POST'])
+@login_required
 def messages():
     if request.method == 'POST':
+        # Check if the user is authenticated
+        if not current_user.is_authenticated:
+            return redirect(url_for('login'))
+
         # Get the form data
         message = request.form['message']
 
@@ -211,13 +222,10 @@ def messages():
         # Query the database for the list of messages
         with pool.getconn() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT user.username, messages.message FROM messages INNER JOIN user ON messages.user_id = user.id ORDER BY messages.id DESC")
+            cursor.execute("SELECT users.username, messages.message FROM messages INNER JOIN users ON messages.user_id = users.id ORDER BY messages.id DESC")
             rows = cursor.fetchall()
 
-        # Return the connection to the pool
-        pool.putconn(conn)
-
-        # Render the messages template
+        # Render the template and pass the list of messages
         return render_template('messages.html', messages=rows)
 
 @app.route('/logout')
