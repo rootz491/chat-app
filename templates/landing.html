@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Broom</title>
+  <link rel="shortcut icon" href="/static/favicon.ico" type="image/x-icon">
+  <style>
+    /* Use the ::before pseudo-element to create a new element for the background image */
+    body::before {
+      content: "";
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -1;
+      /* Apply the blur filter to the new element */
+      filter: blur(5px);
+      /* Set the background image */
+      background-image: url('/path/to/image.jpg');
+      background-size: cover;
+    }
+    /* Center the elements horizontally and vertically */
+    .container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    /* Make the login button responsive */
+    @media (min-width: 600px) {
+      button {
+        width: 300px;
+      }
+    }
+    @media (max-width: 599px) {
+      button {
+        width: 200px;
+      }
+    }
+    img {
+      width: 100px;
+      height: 100px;
+      margin-bottom: 20px;
+    }
+    /* Increase the size and change the color of the h1 element */
+    h1 {
+      margin-bottom: 20px;
+      font-size: 36px;
+      color: white;
+    }
+    /* Change the text of the h1 element */
+    h1:before {
+      content: "Welcome to ";
+    }
+    h1:after {
+      content: "Broom";
+    }
+    button {
+      height: 40px;
+      border: none;
+      border-radius: 5px;
+      background-color: #0077ff;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    /* Style the navigation menu */
+    nav {
+      display: flex;
+      align-items: center;
+      background-color: #333;
+      color: white;
+      height: 50px;
+    }
+    /* Style the image logo */
+    nav img {
+    height: 40px;
+    margin: 5px;
+    }
+
+    /* Style the list of links */
+    nav ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    }
+
+    /* Style the list items */
+    nav li {
+      margin: 0 10px;
+    }
+
+    /* Style the links */
+    nav a {
+      color: white;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <!-- Add the navigation menu -->
+  <nav>
+    <!-- Add the image logo -->
+    <img src="/static/bg-test.jpg" alt="Logo">
+    <!-- Add the list of links -->
+    <ul>
+      <li><a href="#">Home</a></li>
+      <li><a href="#">About</a></li>
+      <li><a href="#">Contact</a></li>
+    </ul>
+  </nav>
+  <div class="container">
+    <img src="https://via.placeholder.com/100x100" alt="BroomApp logo">
+    <h1></h1>
+    <button onclick="window.location.href='/login'">Login</button>
+  </div>
+</body>
+</html>

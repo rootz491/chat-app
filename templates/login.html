@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Login</title>
+  <link rel="shortcut icon" href="/static/favicon.ico" type="image/x-icon">
+  <style>
+    /* Change the font for the whole page */
+    * {
+      font-family: 'Arial', sans-serif;
+    }
+    /* Set the page background to an image */
+    body {
+      background-image: url('/path/to/image.jpg');
+      background-size: cover;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+    }
+    form {
+      width: 300px;
+      display: flex;
+      flex-direction: column;
+    }
+    /* Increase the size of the button and add a shadow */
+    input[type="submit"] {
+      margin: 10px 0;
+      padding: 15px;
+      font-size: 18px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+  </style>
+</head>
+<body>
+  <form method="POST" action="/login">
+    <label for="username">Username:</label><br>
+    <input type="text" id="username" name="username"><br>
+    <label for="password">Password:</label><br>
+    <input type="password" id="password" name="password"><br><br>
+    <!-- Rename the button to "Register now" -->
+    <input type="submit" value="Login">
+    <!-- Add social login options under the button -->
+    <div style="display: flex; justify-content: space-around; margin-top: 10px;">
+      <!-- Register Text & Link-->
+      <p>Don't have an account? <a href="/register">Click here to register</a></p>
+      <!-- Google Authenthicination-->
+      <a href="/login/google"><img src="/static/google-logo.svg" alt="Log in with Google" width="40" height="40"></a>
+    </div>
+  </form> 
+</body>
+</html>
