@@ -25,11 +25,18 @@
 <body>
   <form method="post">
     <h1>Register</h1>
+    {% if error %}
+      <p style="color: red;">{{ error }}</p>
+    {% endif %}
+    {% if success %}
+      <p style="color: green;">{{ success }}</p>
+    {% endif %}
     <label for="username">Username:</label>
     <input type="text" id="username" name="username" required>
     <label for="password">Password:</label>
     <input type="password" id="password" name="password" required>
     <input type="submit" value="Submit">
   </form>
+  <a href="{{url_for('google.login')}}"><img src="/static/google-logo.svg" alt="Register with Google" width="40" height="40"></a>
 </body>
 </html>

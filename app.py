@@ -1,241 +1,343 @@
 import os
+import ssl
+from typing import Callable
+import argon2
+import requests
+import asyncio
+import uvicorn
 import psycopg2
 import psycopg2.pool
-import re
-import argon2
-from flask import Flask, request, session, redirect, url_for, render_template
-from flask_login import LoginManager, UserMixin, login_user, logout_user, current_user
-from flask_sqlalchemy import SQLAlchemy
-from flask_limiter import Limiter
+import psycopg2.extras
+from fastapi import FastAPI, Depends, HTTPException, Request, Response, Security, templating
+from fastapi.security.api_key import APIKeyHeader
+from fastapi.responses import RedirectResponse
+from fastapi.security import HTTPBasic, HTTPBasicCredentials, OAuth2PasswordBearer
+from fastapi.templating import Jinja2Templates
+from fastapi_login import LoginManager
+from fastapi_limiter import FastAPILimiter
+from flask import url_for
+from fastapi_limiter import FastAPILimiter
+from fastapi_limiter.depends import RateLimiter
+from flask_login import UserMixin
+import tortoise
+from flask_dance.consumer import oauth_authorized
+from flask_dance.contrib.google import make_google_blueprint
 from flask_limiter.util import get_remote_address
+from httplib2 import Credentials
+from pydantic import BaseModel, EmailStr
+from tortoise import Tortoise
+from tortoise.models import Model
+from tortoise.fields import Field
+from google_auth_oauthlib.flow import Flow
 from dotenv import load_dotenv
-import database
+from tortoise.models import Model
+from fastapi.security.api_key import APIKey
+import redis.asyncio as redis
 
-
-# Import flask login
-from flask_login import LoginManager, UserMixin, login_required, current_user
-
-# Load the configuration file
+# Load ENV FILE
 load_dotenv('config.env')
 
-# Set up the app
-app = Flask(__name__)
-app.secret_key = os.getenv('SECRET_KEY')
+# Environment variables to store secret key and database URL
 
-# Set up the connection pool
+database_uri = 'postgresql://{user}:{password}@{host}:{port}/{dbname}'.format(
+host=os.getenv('POSTGRES_HOST'),
+port=os.getenv('POSTGRES_PORT'),
+dbname=os.getenv('POSTGRES_DB'),
+user=os.getenv('POSTGRES_USER'),
+password=os.getenv('POSTGRES_PASSWORD')
+)
+
+
+# Client & Secret ID
+
+CLIENT_ID = os.getenv('GOOGLE_OAUTH_CLIENT_ID')
+CLIENT_SECRET = os.getenv('GOOGLE_OAUTH_CLIENT_SECRET')
+
+
+# Create application
+
+app = FastAPI()
+limiter = FastAPILimiter()
+security = OAuth2PasswordBearer(tokenUrl="/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")
+
+# Limiter
+@app.on_event("startup")
+async def startup():
+    redis = redis.from_url("redis://localhost", encoding="utf-8", decode_responses=True)
+    await FastAPILimiter.init(redis)
+
+# Login Algorithm
+algorithm = os.getenv('ALGORITHM_SETTING')
+
+# Set up FastAPI Login
+
+login = LoginManager(secret="breadforever", token_url="/login")
+templates = Jinja2Templates(directory="templates")
+
+# Tortoise Async Function
+async def main():
+    # Initialize Tortoise-ORM
+    await tortoise.init(db_url=database_uri, modules={'models': ['app.models']})
+    await Tortoise.generate_schemas()
+    await asyncio.sleep(0)
+
+asyncio.create_task(main())
+
+# Define a function to extract the credentials from the request
+def get_credentials(token: str = Security(OAuth2PasswordBearer)):
+    # Check if the token is valid and retrieve the associated credentials
+    # You can implement this check by calling your OAuth provider's API and verifying the token
+    # If the token is invalid, you can raise an HTTPException
+    return Credentials.from_authorized_user_info(info=token)
+    
+
+# Define login and logout routes
+@app.get("/login", dependencies=[Depends(RateLimiter(times=2, seconds=5))])
+async def login_route(request: Request, authorization: str = Security(oauth2_scheme)):
+    redirect_uri = request.url_for("auth")
+    return RedirectResponse(redirect_uri)
+
+@app.get("/logout", dependencies=[Depends(RateLimiter(times=2, seconds=5))])
+async def logout_route(request: Request, user=Security(login.get_current_user, scopes=["logged_in"])):
+    login.logout_user(request)
+    return RedirectResponse(url="/")
+
+
+# Define the authorization route
+@app.get("/auth", dependencies=[Depends(RateLimiter(times=2, seconds=5))])
+async def auth_route(request: Request, credentials: OAuth2PasswordBearer = Depends(get_credentials)):
+    # Get the user's profile using the access token provided in the request
+    userinfo = requests.get("https://www.googleapis.com/oauth2/v1/userinfo", auth=credentials).json()
+
+    # Get or create the user
+    user = await User.get_or_create(email=userinfo["email"])
+    user.name = userinfo["name"]
+    await user.save()
+
+    # Log in the user
+    login.log_user_in(request, user)
+
+    # Redirect the user to the main page
+    return RedirectResponse(url="/")
+
+
+# Set up connection pool
 pool = psycopg2.pool.SimpleConnectionPool(
-    minconn=5,
-    maxconn=10,
-    host=os.getenv('POSTGRES_HOST'),
-    port=os.getenv('POSTGRES_PORT'),
-    dbname=os.getenv('POSTGRES_DB'),
-    user=os.getenv('POSTGRES_USER'),
-    password=os.getenv('POSTGRES_PASSWORD')
+minconn=10,
+maxconn=20,
+host=os.getenv('POSTGRES_HOST'),
+port=os.getenv('POSTGRES_PORT'),
+dbname=os.getenv('POSTGRES_DB'),
+user=os.getenv('POSTGRES_USER'),
+password=os.getenv('POSTGRES_PASSWORD'),
+cursor_factory=psycopg2.extras.DictCursor
 )
 
-# Use environment variables to store secret key and database URL
-app.secret_key = os.getenv('SECRET_KEY')
-app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://{user}:{password}@{host}:{port}/{dbname}'.format(
-    host=os.getenv('POSTGRES_HOST'),
-    port=os.getenv('POSTGRES_PORT'),
-    dbname=os.getenv('POSTGRES_DB'),
-    user=os.getenv('POSTGRES_USER'),
-    password=os.getenv('POSTGRES_PASSWORD')
-)
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+# Use a with statement to automatically close the cursor and connection when the block of code finishes execution
 
-# Create a db object and initialize it
-db = SQLAlchemy()
-db.init_app(app)
+with pool.getconn() as conn:
+    cursor = conn.cursor()
+# Execute your database queries here
+    cursor.execute("SELECT * FROM users")
+    rows = cursor.fetchall()
 
-# Define the User and Message models
-class User(db.Model, UserMixin):
-    __tablename__ = 'users'  # DB table if doesnt exist
-    __table_args__ = {'extend_existing': True}  # This will create the table if it doesn't exist
+# Process the results of the query here
 
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(100), unique=True, nullable=False)
-    password = db.Column(db.String(150), nullable=False)
-
-    def set_password(self, password):
-    # Hash the password using argon2
-        self.password = argon2.hash(password)
-
-    def verify_password(self, password):
-        # Verify the password using argon2
-        return argon2.verify(self.password, password)
-
-class Message(db.Model):
-    __tablename__ = 'messages'  # DB TABLE
-    __table_args__ = {'extend_existing': True}  # This will create the table if it doesn't exist
-
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
-    user = db.relationship('User', backref=db.backref('messages', lazy=True))
-    message = db.Column(db.String(80), nullable=False)
-
-# Create the tables in the database
-with app.app_context():
-    database.db.create_all()
+#Return the connection to the pool
+pool.putconn(conn)
 
 
-# Initialize the login manager
-login_manager = LoginManager()
-login_manager.init_app(app)
 
 
-@login_manager.user_loader
-def load_user(user_id):
-    # Get a connection from the pool
-    with pool.getconn() as conn:
-        # Query the database for the user
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM users WHERE id = %s", (user_id,))
-        row = cursor.fetchone()
-        if row is not None:
-            # Create a user object
-            user = User(row[0], row[1], row[2])
-            return user
-        else:
-            # User not found
-            return None
-
-    # Return the connection to the pool
-    pool.putconn(conn)
+# Use the Column attribute to define a model field
+class Base(BaseModel):
+    id = Field(int, primary_key=True)
 
 
-# Include favicon
-@app.route('/favicon.ico')
-def favicon():
-    return favicon('static/favicon.ico')
+# Define USER Model
+
+class User(Model):
+    id = Field(int, pk=True)
+    email = Field(str, index=True)
+    name = Field(str)
+    password = Field(str)
+    salt = Field(str)
+    api_key = Field(str)
+    tokens = Field(str)
+
+# Define the model for the user login
+
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str
+
+# Define the model for user creation
+
+class UserCreate(BaseModel):
+    email: EmailStr
+    password: str
+    name: str
+
+#Define the model for the user update
+class UserUpdate(BaseModel):
+    name: str
+    email: EmailStr
+    password: str
 
 
-# Create the routes
-@app.route('/')
-def index():
-    return render_template('landing.html')
-
-@app.route('/register', methods=['GET', 'POST'])
-def register():
-    if request.method == 'POST':
-        # Get the form data
-        username = request.form['username']
-        password = request.form['password']
-
-        # Validate the username
-        if not username:
-            return render_template('register.html', error='Username is required')
-        if len(username) > 100:
-            return render_template('register.html', error='Username cannot be more than 100 characters')
-        if not re.match(r'^[a-zA-Z0-9_]+$', username):
-            return render_template('register.html', error='Username can only contain letters, numbers, and underscores')
-
-        # Validate the password
-        if not password:
-            return render_template('register.html', error='Password is required')
-        if len(password) < 8:
-            return render_template('register.html', error='Password must be at least 8 characters')
-
-        # Check if the username is already taken
-        with pool.getconn() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT * FROM user WHERE username = %s", (username,))
-            row = cursor.fetchone()
-            if row is not None:
-                return render_template('register.html', error='Username already taken')
-
-            # Insert the new user into the database
-            cursor.execute("INSERT INTO user (username, password) VALUES (%s, %s)", (username, password))
-            conn.commit()
-
-        # Return the connection to the pool
-        pool.putconn(conn)
-
-        # Redirect to the login page
-        return redirect(url_for('login'))
-    else:
-        # Render the register template
-        return render_template('register.html')
+#Define the model for the user update password
+class UserUpdatePassword(BaseModel):
+    old_password: str
+    new_password: str
 
 
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    if request.method == 'POST':
-        # Get the form data
-        username = request.form['username']
-        password = request.form['password']
 
-        # Validate the login
-        with pool.getconn() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT * FROM users WHERE username = %s", (username,))
-            row = cursor.fetchone()
-            if row is None:
-                return render_template('login.html', error='Invalid username or password')
-            if row[2] != password:
-                return render_template('login.html', error='Invalid username or password')
+#Define the route for user login
+@app.post("/login", dependencies=[Depends(RateLimiter(times=2, seconds=5))])
+async def login_route(request: Request, email: EmailStr, password: str):
+    # Get the user
+    user = await User.get(email=email)
+    if not user:
+        raise HTTPException(status_code=400, detail="Incorrect email or password")
 
-            # Create a user object
-            user = User(row[0], row[1], row[2])
+    # Check the password
+    if not argon2.argon2_verify(user.password, password):
+        raise HTTPException(status_code=400, detail="Incorrect email or password")
 
-        # Return the connection to the pool
-        pool.putconn(conn)
+    # Log in the user
+    login.log_user_in(request, user)
 
-        # Log the user in
-        login_user(user)
+    # Redirect the user to the main page
+    return RedirectResponse(url="/")
 
-        # Redirect to the messages page
-        return redirect(url_for('messages'))
-    else:
-        # Render the login template
-        return render_template('login.html')
+# Define the user API key route
+@app.post("/api_key")
+async def api_key_route(request: Request, user=Security(login.get_current_user, scopes=["logged_in"])):
+    # Create a new API key
+    api_key = APIKey(user_id=user.id)
+    await api_key.save()
 
-@app.route('/messages', methods=['GET', 'POST'])
-@login_required
-def messages():
-    if request.method == 'POST':
-        # Check if the user is authenticated
-        if not current_user.is_authenticated:
-            return redirect(url_for('login'))
+    # Redirect the user to the main page
+    return RedirectResponse(url="/")
 
-        # Get the form data
-        message = request.form['message']
+#Set up the route for the home page
+@app.get("/")
+async def main_route(request: Request, user=Security(login.get_current_user, scopes=["logged_in"])):
+    # Render the main template
+    return templates.TemplateResponse("index.html", {
+        "request": request,
+        "user": user,
+    })
 
-        # Validate the message
-        if not message:
-            return render_template('messages.html', error='Message is required')
-        if len(message) > 80:
-            return render_template('messages.html', error='Message cannot be more than 80 characters')
+#Define the route for user creation
+@app.post("/users")
+async def create_user(user_data: UserCreate):
+# Check if the user already exists
+    user = User.query.filter_by(email=user_data.email).first()
+    if user is not None:
+        raise HTTPException(status_code=409, detail="Email already exists")
+        # Hash the password
+    hashed_password = argon2.hash(user_data.password)
+    # Create the user
+    user = User(email=user_data.email, password=hashed_password, name=user_data.name)
+    await Tortoise.get_orm().add(user)
+    await Tortoise.get_orm().commit()
+    return {"id": user.id, "email": user.email}
 
-        # Insert the new message into the database
-        with pool.getconn() as conn:
-            cursor = conn.cursor()
-            cursor.execute("INSERT INTO messages (user_id, message) VALUES (%s, %s)", (current_user.id, message))
-            conn.commit()
+#Define the route for getting the current user
+@app.get("/user")
+def read_user(
+    user: User = Security(login.get_current_user, scopes=["logged_in"]),):
+    return {"id": user.id, "email": user.email, "name": user.name}
 
-        # Return the connection to the pool
-        pool.putconn(conn)
+#Define the route for updating the current user
+@app.put("/user")
+async def update_user(
+    user_data: UserUpdate,
+    user: User = Security(login.get_current_user, scopes=["logged_in"]),):
 
-        # Redirect to the same page to refresh the list of messages
-        return redirect(url_for('messages'))
-    else:
-        # Query the database for the list of messages
-        with pool.getconn() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT users.username, messages.message FROM messages INNER JOIN users ON messages.user_id = users.id ORDER BY messages.id DESC")
-            rows = cursor.fetchall()
+# Update the user's name
+    if user_data.name is not None:
+        user.name = user_data.name
+        await Tortoise.get_orm().commit()
+    return {"id": user.id, "email": user.email, "name": user.name}
 
-        # Render the template and pass the list of messages
-        return render_template('messages.html', messages=rows)
+#Define the route for updating the current user's password
+@app.put("/user/password")
+async def update_user_password(
+    password_data: UserUpdatePassword,
+    user: User = Security(login.get_current_user, scopes=["logged_in"]),):
 
-@app.route('/logout')
+
+# Check the old password
+    if not argon2.verify(password_data.old_password, user.password):
+        return Response(status_code=401, detail="Incorrect old password")
+
+# Hash the new password
+    hashed_password = argon2.hash(password_data.new_password)
+
+# Update the user's password
+    user.password = hashed_password
+    await Tortoise.get_orm().commit()
+
+#Define the route for deleting the current user
+@app.delete("/user")
+async def delete_user(user: User = Security(login.get_current_user, scopes=["logged_in"]),):
+    await Tortoise.get_orm().delete(user)
+    await Tortoise.get_orm().commit()
+    return {"message": "Success"}
+
+#Define the route for getting the user list
+@app.get("/users")
+def read_users(skip: int = 0, limit: int = 100):
+    users = User.query.offset(skip).limit(limit).all()
+    return [{"id": user.id, "email": user.email, "name": user.name} for user in users]
+
+#Define the route for getting a single user
+@app.get("/users/{user_id}")
+def read_user(user_id: int):
+    user = User.query.filter_by(id=user_id).first()
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"id": user.id, "email": user.email, "name": user.name}
+
+#Set up the route for logging out
+@app.get("/logout")
 def logout():
-    # Logout the user
-    session.pop('user_id', None)
+    login.logout_user()
+    return {"message": "Success"}
 
-    # Redirect the user to the index page
-    return redirect(url_for('index'))
+#Set up the route for the home page
+@app.get("/")
+@templating.template("home.html")
+def home(request: Request):
+    if login.is_logged_in():
+        return {"user_email": login.current_user.email}
+    else:
+        return {}
 
-# Start the app
-if __name__ == '__main__':
-    app.run()
+
+#Set up the error handler for 401 Unauthorized
+@app.exception_handler(401)
+def unauthorized(request: Request, exc: Exception):
+    return RedirectResponse(url_for("google.login"))
+
+#Set up the error handler for 404 Not Found
+@app.exception_handler(404)
+def not_found(request: Request, exc: Exception):
+    return {"error": "Not found"}
+
+#Set up the error handler for 422 Unprocessable Entity
+@app.exception_handler(422)
+def unprocessable_entity(request: Request, exc: Exception):
+    return {"error": str(exc)}
+
+#Set up the error handler for 500 Internal Server Error
+@app.exception_handler(500)
+def internal_server_error(request: Request, exc: Exception):
+    return {"error": "Internal server error"}
+
+# Start the ASGI Server
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=5000, log_level="info")

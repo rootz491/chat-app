@@ -1,0 +1,395 @@
+import os
+import psycopg2
+import psycopg2.pool
+import psycopg2.extras
+import re
+import argon2
+import ssl
+import requests
+import uvicorn
+from pydantic import BaseModel
+from flask_login import LoginManager, UserMixin
+from flask_sqlalchemy import SQLAlchemy
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from dotenv import load_dotenv
+from flask_dance.consumer import oauth_authorized
+from flask_dance.contrib.google import google, make_google_blueprint
+from fastapi import FastAPI, Request, Response, Depends, HTTPException, Security, status, templating
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
+from pydantic import EmailStr
+from fastapi.security.api_key import APIKeyHeader
+from fastapi.responses import RedirectResponse
+from fastapi.security import HTTPBasic, HTTPBasicCredentials, OAuth2PasswordBearer
+from flask import Flask, redirect, url_for, render_template, session
+from fastapi import APIRouter
+from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import Flow
+
+
+
+# Load the configuration file
+load_dotenv('config.env')
+
+# Set up the app
+app = FastAPI()
+app.secret_key = os.getenv('SECRET_KEY')
+security = OAuth2PasswordBearer(tokenUrl="/login")
+
+def oauth2_scheme(token: str = Depends(OAuth2PasswordBearer(tokenUrl="/token"))):
+    return token
+
+router = APIRouter()
+
+# Replace these with your own client ID and secret
+CLIENT_ID = os.getenv('GOOGLE_OAUTH_CLIENT_ID')
+CLIENT_SECRET = os.getenv('GOOGLE_OAUTH_CLIENT_SECRET')
+
+# Set up the OAuth 2.0 flow
+flow = Flow.from_client_secrets_file(
+    client_secrets_file="client_secrets.json",
+    scopes=["https://www.googleapis.com/auth/userinfo.email", "https://www.googleapis.com/auth/userinfo.profile"],
+)
+
+# Set up the connection pool
+pool = psycopg2.pool.SimpleConnectionPool(
+    minconn=10,
+    maxconn=20,
+    host=os.getenv('POSTGRES_HOST'),
+    port=os.getenv('POSTGRES_PORT'),
+    dbname=os.getenv('POSTGRES_DB'),
+    user=os.getenv('POSTGRES_USER'),
+    password=os.getenv('POSTGRES_PASSWORD'),
+    cursor_factory=psycopg2.extras.DictCursor
+)
+
+# Use a with statement to automatically close the cursor and connection when the block of code finishes execution
+with pool.getconn() as conn:
+    cursor = conn.cursor()
+    # Execute your database queries here
+    cursor.execute("SELECT * FROM users")
+    rows = cursor.fetchall()
+    # Process the results of the query here
+
+# Return the connection to the pool
+pool.putconn(conn)
+
+# Use environment variables to store secret key and database URL
+app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://{user}:{password}@{host}:{port}/{dbname}'.format(
+    host=os.getenv('POSTGRES_HOST'),
+    port=os.getenv('POSTGRES_PORT'),
+    dbname=os.getenv('POSTGRES_DB'),
+    user=os.getenv('POSTGRES_USER'),
+    password=os.getenv('POSTGRES_PASSWORD')
+)
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# Create a db object and initialize it
+db = SQLAlchemy()
+db.init_app(app)
+
+
+# Define the User and Message models
+class User(db.Model, UserMixin):
+    __tablename__ = 'users'  # DB table if it doesn't exist
+    __table_args__ = {'extend_existing': True}  # This will create the table if it doesn't exist
+
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(100), unique=True, nullable=False)
+    password = db.Column(db.String(150), nullable=False)
+
+    def __init__(self, id, username, password):
+        self.id = id
+        self.username = username
+        self.password = password
+
+    def set_password(self, password):
+    # Hash the password
+        hashed_password = argon2.hash_password(password.encode('utf-8'), time_cost=10, memory_cost=1024, parallelism=2, hash_len=32, type=argon2.Type.ID)
+        self.password = hashed_password
+
+    def verify_password(self, password):
+    # Verify the password using argon2
+        return argon2.verify_password(self.password, password.encode('utf-8'))
+
+
+class Message(db.Model):
+    __tablename__ = 'messages'
+    __table_args__ = {'extend_existing': True}
+
+    id = db.Column(db.Integer, primary_key=True)
+    sender_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    recipient_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    message = db.Column(db.String(500), nullable=False)
+    timestamp = db.Column(db.DateTime, nullable=False)
+
+    def __init__(self, id, sender_id, recipient_id, message, timestamp):
+        self.id = id
+        self.sender_id = sender_id
+        self.recipient_id = recipient_id
+        self.message = message
+        self.timestamp = timestamp
+
+
+with app.app_context():
+    # Create the tables in the database
+    db.create_all()
+
+
+# Create the login manager
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
+login_manager.login_message_category = 'warning'
+
+
+@login_manager.user_loader
+def load_user(user_id):
+    with pool.getconn() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM users WHERE id = %s", (user_id,))
+        user = cursor.fetchone()
+        pool.putconn(conn)
+    if user is not None:
+        return User(id=user[0], username=user[1], password=user[2])
+
+def login_user(user):
+    login_manager.login_user(user)
+    
+# Set up rate limiting
+limiter = Limiter(app,
+key_func=get_remote_address,
+default_limits=["200 per day", "50 per hour"]
+)
+limiter.init_app(app)
+
+# Include favicon
+@app.get('/favicon.ico')
+def favicon():
+    return favicon('static/favicon.ico')
+
+# Set up OAuth
+def google_authorized(token, pool):
+    resp = google.get("/oauth2/v2/userinfo")
+    if resp.ok:
+        google_info = resp.json()
+        google_user_id = google_info["id"]
+        google_username = google_info["name"]
+    with pool.getconn() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM users WHERE google_id = %s", (google_user_id,))
+        user = cursor.fetchone()
+    if user is None:
+        # Create a new user
+        cursor.execute("INSERT INTO users (google_id, username) VALUES (%s, %s) RETURNING id", (google_user_id, google_username))
+        user_id = cursor.fetchone()[0]
+        user = User(id=user_id, google_id=google_user_id, username=google_username)
+        pool.putconn(conn)
+    login_user(user)
+
+
+# Configure Google OAuth blueprint
+google_bp = make_google_blueprint(client_id=os.getenv('GOOGLE_OAUTH_CLIENT_ID'), client_secret=os.getenv('GOOGLE_OAUTH_CLIENT_SECRET'))
+app.register_blueprint(google_bp, url_prefix="/login")
+
+# Redirect Google Login 
+def google_logged_in(blueprint, token, pool, db):
+    # Check if the user already exists in the database
+    with pool.getconn() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM users WHERE username = %s", (token['sub'],))
+        row = cursor.fetchone()
+    # If the user doesn't exist, create a new user
+    if row is None:
+        # Create a new user
+        user = User(id=token['sub'], username=token['sub'], password='')
+        db.session.add(user)
+        db.session.commit()
+        # Log the user in
+        login_user(user)
+    else:
+        # Log the user in
+        login_user(User(row[0], row[1], row[2]))
+
+        # Return the connection to the pool
+        pool.putconn(conn)
+
+    # Redirect to the messages page
+    return redirect(url_for('messages'))
+
+
+# Create the routes for fastapi
+@app.get('/')
+def index():
+    return render_template('landing.html')
+
+@app.get('/register')
+def register(request, pool):
+    if request.method == 'POST':
+        # Get the form data
+        username = request.form['username']
+        password = request.form['password']
+
+        # Validate the form data
+        if not username or not password:
+            return render_template('register.html', error='Username and password are required')
+        if len(password) < 8:
+            return render_template('register.html', error='Password must be at least 8 characters long')
+        if not re.fullmatch(r'^[a-zA-Z0-9_]+$', username):
+            return render_template('register.html', error='Username can only contain letters, numbers, and underscores')
+
+        # Check if the username is already in use
+        with pool.getconn() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id FROM users WHERE username = %s", (username,))
+            row = cursor.fetchone()
+            if row is not None:
+                return render_template('register.html', error='Username is already in use')
+
+        # Create a new user
+        user = User(username=username)
+        user.set_password(password)
+        db.session.add(user)
+        db.session.commit()
+
+        # Log the user in
+        login_user(user)
+
+        # Redirect to the messages page
+        return redirect(url_for('messages'))
+
+    # Render the register template if the request method is GET
+    return render_template('register.html')
+
+@app.get("/login")
+def login(request, current_user, pool):
+    # Check if the user is already logged in
+    if current_user.is_authenticated:
+        # Redirect the user to the messages page
+        return RedirectResponse(url_for("messages"))
+
+    if request.method == "POST":
+        # Get the form data
+        username = request.form["username"]
+        password = request.form["password"]
+
+        # Validate the login
+        with pool.getconn() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM users WHERE username = %s", (username,))
+            row = cursor.fetchone()
+            if row is None:
+                return render_template("login.html", error="Invalid username or password")
+            if row[2] != password:
+                return render_template("login.html", error="Invalid username or password")
+
+            # Create a user object
+            user = User(row[0], row[1], row[2])
+
+            # Log the user in
+            login_user(user)
+
+        # Return the connection to the pool
+        pool.putconn(conn)
+
+        # Redirect to the messages page
+        return RedirectResponse(url_for("messages"))
+    else:
+        # Render the login template
+        # Set up the OAuth 2.0 flow
+        flow = Flow.from_client_secrets_file(
+            client_secrets_file="client_secrets.json",
+            scopes=["https://www.googleapis.com/auth/userinfo.email", "https://www.googleapis.com/auth/userinfo.profile"],
+        )
+
+        # Generate the authorization URL
+        authorization_url, state = flow.authorization_url(
+            access_type="offline", prompt="consent", include_granted_scopes="true"
+        )
+
+        # Store the state in the session
+        session["state"] = state
+
+        # Render the login template, passing in the authorization URL
+        return render_template("login.html", authorization_url=authorization_url)
+
+
+@app.get("/login/authorized")
+def callback(request):
+    code = request.query_params.get("code")
+    if code:
+        # Exchange the authorization code for an access token and refresh token
+        flow.fetch_token(code=code)
+        credentials = flow.credentials
+        # Store the credentials in a secure manner (e.g. in a database)
+        return "Login successful"
+    else:
+        return "Error: authorization code not found"
+
+@app.get("/profile")
+async def profile(credentials: OAuth2PasswordBearer = Depends(oauth2_scheme)):
+    # get user's Google profile info
+    user_info = google.get("/oauth2/v1/userinfo").json()
+    return user_info
+
+@app.get("/messages", dependencies=[Depends(security)])
+def messages(request, credentials: HTTPBasicCredentials = Depends(security)):
+    if request.method == "POST":
+        # Check if the user is authenticated
+        if not credentials or not check_credentials(credentials.username, credentials.password):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Incorrect email or password",
+                headers={"WWW-Authenticate": "Basic"},
+            )
+
+        # Get the form data
+        message = request.form["message"]
+
+        # Validate the message
+        if not message:
+            return templating.TemplateResponse("messages.html", {"request": request, "error": "Message is required"})
+        if len(message) > 80:
+            return templating.TemplateResponse("messages.html", {"request": request, "error": "Message cannot be more than 80 characters"})
+
+        # Insert the new message into the database
+        with pool.getconn() as conn:
+            cursor = conn.cursor()
+            cursor.execute("INSERT INTO messages (user_id, message) VALUES (%s, %s)", (credentials.username, message))
+            conn.commit()
+
+        # Return the connection to the pool
+        pool.putconn(conn)
+
+        # Redirect to the same page to refresh the list of messages
+        return RedirectResponse(url="/messages")
+    else:
+        # Query the database for the list of messages
+        with pool.getconn() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT users.username, messages.message FROM messages INNER JOIN users ON messages.user_id = users.id ORDER BY messages.id DESC")
+            rows = cursor.fetchall()
+
+        # Render the template and pass the list of messages
+        return templating.TemplateResponse("messages.html", {"request": request, "messages": rows})
+
+def check_credentials(username: str, password: str):
+    with pool.getconn() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM users WHERE username = %s", (username,))
+        row = cursor.fetchone()
+        if row is not None:
+            user = User(row["id"], username, row["password"])
+            if user.verify_password(password):
+                return True
+        return False
+
+
+
+@app.get("/logout")
+def logout():
+    return Response(status_code=302, headers={"Location": "/"})
+
+# Start the uWSGI server with 4 worker processes and 2 threads per process
+uvicorn.run(app, host="localhost", port=5000)

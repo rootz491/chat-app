@@ -1,0 +1,321 @@
+import os
+import ssl
+import argon2
+
+from fastapi import FastAPI, Depends, HTTPException, Request, Security
+from fastapi.security.api_key import APIKeyHeader
+from fastapi.responses import RedirectResponse
+from fastapi.security import HTTPBasic, HTTPBasicCredentials, OAuth2PasswordBearer
+from flask_limiter import Limiter
+from flask_login import UserMixin
+from flask_sqlalchemy import SQLAlchemy
+from httplib2 import Credentials
+import psycopg2
+from pydantic import BaseModel, EmailStr
+import requests
+from starlette.templating import Jinja2Templates
+
+from fastapi_login import FastAPILogin, LoginManager
+from fastapi_login.exceptions import UserNotFound, IncorrectPassword
+import uvicorn
+from google_auth_oauthlib.flow import Flow
+
+# Client & Secret ID
+
+CLIENT_ID = os.getenv('GOOGLE_OAUTH_CLIENT_ID')
+CLIENT_SECRET = os.getenv('GOOGLE_OAUTH_CLIENT_SECRET')
+
+# Setup OAuth Flow
+flow = Flow.from_client_secrets_file(
+client_secrets_file="client_secrets.json",
+scopes=["https://www.googleapis.com/auth/userinfo.email", "https://www.googleapis.com/auth/userinfo.profile"],
+)
+
+# Create application
+
+app = FastAPI()
+app.secret_key = os.getenv('SECRET_KEY')
+security = OAuth2PasswordBearer(tokenUrl="/login")
+
+# Set up templates
+
+templates = Jinja2Templates(directory="templates")
+
+# Set up FastAPI Login
+
+login = FastAPILogin(app)
+
+# Define login and logout routes
+@app.get("/login")
+async def login_route(request: Request):
+    redirect_uri = request.url_for("auth")
+    return await flow.authorize_redirect(request, redirect_uri)
+
+@app.get("/logout")
+async def logout_route(request: Request, user=Security(login.get_current_user, scopes=["logged_in"])):
+    login.logout_user(request)
+    return RedirectResponse(url="/")
+
+
+# Define the authorization route
+@app.get("/auth")
+async def auth_route(request: Request):
+# Get the authorization code from the request
+    code = request.query_params.get("code")
+# Use the authorization code to get an access token
+    token = await flow.fetch_token(code=code)
+
+# Use the access token to get the user's profile
+    credentials = Credentials.from_authorized_user_info(info=token)
+    userinfo = requests.get("https://www.googleapis.com/oauth2/v1/userinfo",headers={"Authorization": f"Bearer {credentials.token}"},).json()
+
+# Save the user's profile to the database
+    user = login.get_or_create_user(
+        email=userinfo["email"],
+        password=None,
+        name=userinfo["name"],
+    )
+    login.login_user(request, user)
+
+# Redirect the user to the home page
+    return RedirectResponse(url="/home")
+
+#Set up the route for the home page
+@app.get("/")
+@templating.template("home.html")
+def home(request: Request):
+    if login.is_logged_in():
+        return {"user_email": login.current_user.email}
+    else:
+        return {}
+
+# Set up connection pool
+
+
+pool = psycopg2.pool.SimpleConnectionPool(
+minconn=10,
+maxconn=20,
+host=os.getenv('POSTGRES_HOST'),
+port=os.getenv('POSTGRES_PORT'),
+dbname=os.getenv('POSTGRES_DB'),
+user=os.getenv('POSTGRES_USER'),
+password=os.getenv('POSTGRES_PASSWORD'),
+cursor_factory=psycopg2.extras.DictCursor
+)
+
+# Use a with statement to automatically close the cursor and connection when the block of code finishes execution
+
+with pool.getconn() as conn:
+    cursor = conn.cursor()
+# Execute your database queries here
+    cursor.execute("SELECT * FROM users")
+    rows = cursor.fetchall()
+
+# Process the results of the query here
+
+#Return the connection to the pool
+pool.putconn(conn)
+
+# Environment variables to store secret key and database URL
+
+app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://{user}:{password}@{host}:{port}/{dbname}'.format(
+host=os.getenv('POSTGRES_HOST'),
+port=os.getenv('POSTGRES_PORT'),
+dbname=os.getenv('POSTGRES_DB'),
+user=os.getenv('POSTGRES_USER'),
+password=os.getenv('POSTGRES_PASSWORD')
+)
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# Create a db object and initialize it
+db = SQLAlchemy(app)
+
+#Set up the login manager
+login_manager = LoginManager(app)
+
+#Set up rate limiting
+limiter = Limiter(app, key_func=get_remote_address)
+
+# Set up Google OAuth
+google_bp = make_google_blueprint(client_id=CLIENT_ID, client_secret=CLIENT_SECRET)
+app.register_blueprint(google_bp, url_prefix="/login")
+
+# Set up SSL context
+context = ssl.create_default_context(purpose=ssl.Purpose.CLIENT_AUTH)
+context.load_cert_chain(ssl_cert_file="/domain/usebroom.com.pem", ssl_key_file="/domain/usebroom.com.key")
+
+
+# Define USER Model
+
+class User(UserMixin, db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(100), unique=True)
+    password = db.Column(db.String(100))
+    name = db.Column(db.String(100))
+
+# Define the model for the user login
+
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str
+
+# Define the model for user creation
+
+class UserCreate(BaseModel):
+    email: EmailStr
+    password: str
+    name: str
+
+#Define the model for the user update
+class UserUpdate(BaseModel):
+    name: str
+    email: EmailStr
+    password: str
+
+
+#Define the model for the user update password
+class UserUpdatePassword(BaseModel):
+    old_password: str
+    new_password: str
+
+#Define the route for user login
+@app.post("/login")
+def login_user(login_data: UserLogin):
+# Get the user from the database
+    user = User.query.filter_by(email=login_data.email).first()
+    if user is None:
+        raise UserNotFound()
+    if not argon2.verify(login_data.password, user.password):
+        raise IncorrectPassword()
+    return {"access_token": login.create_access_token(user.id), "token_type": "bearer"}
+
+#Define the route for user creation
+@app.post("/users")
+def create_user(user_data: UserCreate):
+# Check if the user already exists
+    user = User.query.filter_by(email=user_data.email).first()
+    if user is not None:
+        raise HTTPException(status_code=409, detail="Email already exists")
+        # Hash the password
+    hashed_password = argon2.hash(user_data.password)
+    # Create the user
+    user = User(email=user_data.email, password=hashed_password, name=user_data.name)
+    db.session.add(user)
+    db.session.commit()
+    return {"id": user.id, "email": user.email}
+
+#Define the route for getting the current user
+@app.get("/user")
+def read_user(
+    user: User = Security(login.get_current_user, scopes=["logged_in"]),):
+    return {"id": user.id, "email": user.email, "name": user.name}
+
+#Define the route for updating the current user
+@app.put("/user")
+def update_user(
+user_data: UserUpdate,
+user: User = Security(login.get_current_user, scopes=["logged_in"]),
+):
+# Update the user's name
+    if user_data.name is not None:
+        user.name = user_data.name
+        db.session.commit()
+    return {"id": user.id, "email": user.email, "name": user.name}
+
+#Define the route for updating the current user's password
+@app.put("/user/password")
+def update_user_password(
+password_data: UserUpdatePassword,
+user: User = Security(login.get_current_user, scopes=["logged_in"]),):
+
+
+# Check the old password
+    if not argon2.verify(password_data.old_password, user.password):
+        raise IncorrectPassword()
+
+# Hash the new password
+    hashed_password = argon2.hash(password_data.new_password)
+
+# Update the user's password
+    user.password = hashed_password
+    db.session.commit()
+
+#Define the route for deleting the current user
+@app.delete("/user")
+def delete_user(user: User = Security(login.get_current_user, scopes=["logged_in"]),):
+    db.session.delete(user)
+    db.session.commit()
+    return {"message": "Success"}
+
+#Define the route for getting the user list
+@app.get("/users")
+def read_users(skip: int = 0, limit: int = 100):
+    users = User.query.offset(skip).limit(limit).all()
+    return [{"id": user.id, "email": user.email, "name": user.name} for user in users]
+
+#Define the route for getting a single user
+@app.get("/users/{user_id}")
+def read_user(user_id: int):
+    user = User.query.filter_by(id=user_id).first()
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"id": user.id, "email": user.email, "name": user.name}
+
+#Set up OAuth authorized callback
+@oauth_authorized.connect_via(google_bp)
+def google_logged_in(blueprint, token):
+        # Check if the user is already logged in
+    if not login.is_loggedin():
+        # Get the user's information from the OAuth provider
+        resp = blueprint.session.get("/oauth2/v2/userinfo")
+    if resp.ok:
+        # Look for an existing user with the same email address
+        email = resp.json()["email"]
+        user = User.query.filter_by(email=email).first()
+    if user is None:
+        # Create a new user with the email address
+        user = User(email=email)
+        db.session.add(user)
+        db.session.commit()
+        # Log the user in
+        login.login_user(user)
+
+#Set up the route for logging out
+@app.get("/logout")
+def logout():
+    login.logout_user()
+    return {"message": "Success"}
+
+#Set up the route for the home page
+@app.get("/")
+@templating.template("home.html")
+def home(request: Request):
+    if login.is_logged_in():
+        return {"user_email": login.current_user.email}
+    else:
+        return {}
+
+
+#Set up the error handler for 401 Unauthorized
+@app.exception_handler(401)
+def unauthorized(request: Request, exc: Exception):
+    return RedirectResponse(url_for("google.login"))
+
+#Set up the error handler for 404 Not Found
+@app.exception_handler(404)
+def not_found(request: Request, exc: Exception):
+    return {"error": "Not found"}
+
+#Set up the error handler for 422 Unprocessable Entity
+@app.exception_handler(422)
+def unprocessable_entity(request: Request, exc: Exception):
+    return {"error": str(exc)}
+
+#Set up the error handler for 500 Internal Server Error
+@app.exception_handler(500)
+def internal_server_error(request: Request, exc: Exception):
+    return {"error": "Internal server error"}
+
+#Run the app
+if name == "main":
+    uvicorn.run(app, host="localhost", port=5000, ssl_context=context)

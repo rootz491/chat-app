@@ -33,20 +33,30 @@
   </style>
 </head>
 <body>
+  {% if error %}
+    <div style="color: red;">{{ error }}</div>
+  {% endif %}
+  {% if success %}
+    <div style="color: green;">{{ success }}</div>
+  {% endif %}
   <form method="POST" action="/login">
     <label for="username">Username:</label><br>
     <input type="text" id="username" name="username"><br>
     <label for="password">Password:</label><br>
     <input type="password" id="password" name="password"><br><br>
-    <!-- Rename the button to "Register now" -->
     <input type="submit" value="Login">
     <!-- Add social login options under the button -->
     <div style="display: flex; justify-content: space-around; margin-top: 10px;">
-      <!-- Register Text & Link-->
-      <p>Don't have an account? <a href="/register">Click here to register</a></p>
-      <!-- Google Authenthicination-->
-      <a href="/login/google"><img src="/static/google-logo.svg" alt="Log in with Google" width="40" height="40"></a>
+    <!-- Register Text & Link-->
+    <p>Don't have an account? <a href="/register">Click here to register</a></p>
+    <!-- Google Authenthicination-->
+    <a href="{{url_for('google.login')}}"><img src="/static/google-logo.svg" alt="Log in with Google" width="40" height="40"></a>
     </div>
-  </form> 
+
+  </form>
+  {% if current_user.is_authenticated %}
+
+  <script>window.location.replace('{{ url_for("messages") }}');</script>
+  {% endif %}
 </body>
 </html>
