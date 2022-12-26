@@ -14,7 +14,7 @@ const userSchema = new mongoose.Schema(
 			validate: validator({
 				validator: "escape",
 				message: "Invalid characters in username",
-			  }),
+			}),
 		},
 		password: {
 			type: String,
@@ -78,6 +78,10 @@ const userSchema = new mongoose.Schema(
 			type: Date,
 			required: false,
 		},
+		communities: [{
+			type: mongoose.Schema.Types.ObjectId,
+			ref: 'Community',
+		}]
 	},
 	// Tells 'createdAt' and 'updatedAt' timestamps
 	{
