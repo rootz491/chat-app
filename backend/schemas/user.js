@@ -8,6 +8,7 @@ const userSchema = new mongoose.Schema(
 			type: String,
 			required: true,
 			unique: true,
+			maxlength: 16,
 			trim: true,
 			minlength: 3,
 			index: true,
@@ -78,10 +79,6 @@ const userSchema = new mongoose.Schema(
 			type: Date,
 			required: false,
 		},
-		communities: [{
-			type: mongoose.Schema.Types.ObjectId,
-			ref: 'Community',
-		}]
 	},
 	// Tells 'createdAt' and 'updatedAt' timestamps
 	{

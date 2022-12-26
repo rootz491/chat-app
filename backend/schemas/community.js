@@ -1,15 +1,24 @@
 const mongoose = require('mongoose');
+const validator = require("mongoose-validator");
 
 const communitySchema = new mongoose.Schema({
-    name: {
+       name: {
         type: String,
         required: true,
-        unique: true
+        unique: true,
+        validate: validator({
+            validator: "escape",
+            message: "Invalid characters in username",
+        }),
       },
       id: {
         type: String,
         required: true,
-        unique: true
+        unique: true,
+        validate: validator({
+            validator: "escape",
+            message: "Invalid characters in username",
+        }),
       },
       users: [{
         type: mongoose.Schema.Types.ObjectId,
