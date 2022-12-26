@@ -15,6 +15,17 @@ const badgeSchema = new mongoose.Schema(
 			trim: true,
 			minlength: 3,
 		},
+		image: {
+			type: String,
+			required: true,
+			trim: true,
+			minlength: 3,
+		},
+		communityRef: {
+			type: mongoose.Schema.Types.ObjectId,
+			ref: "Community",
+			required: true,
+		},
 	},
 	{
 		timestamps: true,
