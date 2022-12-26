@@ -1,18 +1,18 @@
 const User = require("../../schemas/user");
 const jwt = require("jsonwebtoken");
 const axios = require("axios");
-const bcrypt = require("bcrypt");
+const argon2 = require('argon2');
 const Sentry = require("@sentry/node");
 const mongooseJsonSchema = require('mongoose-schema-jsonschema');
 const ajv = require('ajv');
 
 
 // Generate JSON Schema (CAUSES ERROR)
-const userJsonSchema = mongooseJsonSchema(User.schema);
+//const userJsonSchema = mongooseJsonSchema(User.schema);
 
 // Compile JSON Schema (CAUSES ERROR)
-const validator = new ajv();
-const validate = validator.compile(userJsonSchema);
+//const validator = new ajv();
+//const validate = validator.compile(userJsonSchema);
 
 exports.signup = async (req, res) => {
   const saltRounds = 10;
@@ -60,8 +60,8 @@ exports.signup = async (req, res) => {
       password,
     });
 
-    const salt = await bcrypt.genSalt(saltRounds);
-    newUser.password = await bcrypt.hash(newUser.password, salt);
+    const salt = await argon2.generateSalt();
+    newUser.password = await argon2.hash(newUser.password, salt);
 
     await newUser.save();
     res.status(201).json({ message: "User created" });
@@ -211,7 +211,7 @@ exports.login = async (req, res) => {
         message: "Invalid email or password",
       };
     }
-    const result = await bcrypt.compare(password, user.password);
+    const result = await argon2.verify(user.password, password);
 
     if (!result) {
       throw {
