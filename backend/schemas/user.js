@@ -52,16 +52,18 @@ const userSchema = new mongoose.Schema(
 				validator: "isURL",
 				message: "Invalid image URL",
 				protocols: ["http", "https"],
-				require_protocol: true
+				require_protocol: true,
 			}),
 		},
 		// Array Field for IDs of User's Communities
-		Communities: [{
-			type: mongoose.Schema.Types.ObjectId,
-			ref: 'Community',
-			index: true,
-		}],
-		// User's global role		
+		Communities: [
+			{
+				type: mongoose.Schema.Types.ObjectId,
+				ref: "Community",
+				index: true,
+			},
+		],
+		// User's global role
 		role: {
 			type: String,
 			required: true,
@@ -78,10 +80,12 @@ const userSchema = new mongoose.Schema(
 			type: Date,
 			required: false,
 		},
-		communities: [{
-			type: mongoose.Schema.Types.ObjectId,
-			ref: 'Community',
-		}]
+		communities: [
+			{
+				type: mongoose.Schema.Types.ObjectId,
+				ref: "Community",
+			},
+		],
 	},
 	// Tells 'createdAt' and 'updatedAt' timestamps
 	{

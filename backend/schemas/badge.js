@@ -8,18 +8,21 @@ const badgeSchema = new mongoose.Schema(
 			unique: true,
 			trim: true,
 			minlength: 3,
-		},
-		description: {
-			type: String,
-			required: true,
-			trim: true,
-			minlength: 3,
+			maxlength: 16,
 		},
 		image: {
 			type: String,
 			required: true,
 			trim: true,
 			minlength: 3,
+			validate: validator({
+				validator: "escape",
+				message: "Invalid characters in username",
+			}),
+			validate: validator({
+				validator: "isURL",
+				message: "Invalid image URL",
+			}),
 		},
 		communityRef: {
 			type: mongoose.Schema.Types.ObjectId,
