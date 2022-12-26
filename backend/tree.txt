@@ -1,0 +1,28 @@
+C:\USERS\ALPLA\DESKTOP\BROOM\BACKEND
+|   .env
+|   app.js
+|   package-lock.json
+|   package.json
+|   tree.txt
+|   
++---controllers
+|   +---auth
+|   |       index.js
+|   |       
+|   \---user
+|           index.js
+|           
++---middleware
+|       index.js
+|       
+|                   
++---routes
+|       auth.js
+|       index.js
+|       users.js
+|       
++---schemas
+|       user.js
+|       
+\---sockets
+        websocket.js
