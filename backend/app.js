@@ -5,11 +5,11 @@ const cors = require("cors");
 const Sentry = require('@sentry/node');
 const websocket = require('./websocket');
 const winston = require("winston");
+const helmet = require("helmet");
 
 // Load Config & Sentry
 Sentry.init({ dsn: 'https://ea69acd8829843d1bae67b685a5e044a@o4504392106770432.ingest.sentry.io/4504392107753472' });
 require("dotenv").config();
-
 
 // Initialize Logger
 const logger = winston.createLogger({
@@ -17,7 +17,6 @@ const logger = winston.createLogger({
 	format: winston.format.json(),
 	transports: [new winston.transports.Console()]
   });
-
 
 // Connect to MongoDB
 const connectToMongo = async () => {
@@ -30,7 +29,6 @@ const connectToMongo = async () => {
   
   connectToMongo();
 
-
 // WS Server
 websocket.start();
 
@@ -40,8 +38,9 @@ const usersRouter = require("./routes/users");
 const authRouter = require("./routes/auth");
 const { isAuthenticated } = require("./middleware");
 
-// Express App
+// Express App & Sub-Apps
 const app = express();
+app.use(helmet());
 
 // Middleware
 app.use(cors());
