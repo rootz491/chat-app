@@ -7,6 +7,19 @@ const Sentry = require('@sentry/node');
 Sentry.init({ dsn: 'https://ea69acd8829843d1bae67b685a5e044a@o4504392106770432.ingest.sentry.io/4504392107753472' });
 require("dotenv").config();
 
+
+// Connect to MongoDB
+const connectToMongo = async () => {
+	await mongoose.connect(process.env.MONGO_URI, {
+	  useNewUrlParser: true,
+	  useUnifiedTopology: true,
+	});
+	console.log("Connected to MongoDB");
+  };
+  
+  connectToMongo();
+
+
 const indexRouter = require("./routes/index");
 const usersRouter = require("./routes/users");
 const authRouter = require("./routes/auth");
@@ -30,11 +43,6 @@ app.use("/v1/user", isAuthenticated, usersRouter);
 app.use(Sentry.Handlers.errorHandler());
 
 app.listen(8000, async () => {
-	await mongoose.connect(process.env.MONGO_URI, {
-		useNewUrlParser: true,
-		useUnifiedTopology: true,
-	});
-	console.log("Connected to MongoDB");
 	console.log("Server started on port 8000");
 });
 

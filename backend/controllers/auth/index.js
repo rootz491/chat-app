@@ -2,22 +2,43 @@ const User = require("../../schemas/user");
 const jwt = require("jsonwebtoken");
 const axios = require("axios");
 const bcrypt = require("bcrypt");
+const Sentry = require("@sentry/node");
+const mongooseJsonSchema = require('mongoose-schema-jsonschema');
+const ajv = require('ajv');
+
+
+// Generate JSON Schema (CAUSES ERROR)
+const userJsonSchema = mongooseJsonSchema(User.schema);
+
+// Compile JSON Schema (CAUSES ERROR)
+const validator = new ajv();
+const validate = validator.compile(userJsonSchema);
 
 exports.signup = async (req, res) => {
   const saltRounds = 10;
   try {
     const { username, email, password } = req.body;
-    if (!username || !email || !password) {
-      throw {
-        status: 400,
-        message: "Missing required fields",
-      };
+    try {
+      const isValid = validate(req.body);
+      if (!isValid) {
+        throw {
+          status: 400,
+          message: validate.errors,
+        };
+      }
+    } catch (error) {
+      res.status(error.status).json({ message: error.message });
     }
-    if (password.length < 6) {
-      throw {
-        status: 400,
-        message: "Password must be at least 6 characters long",
-      };
+    try {
+      const isValid = validate(req.body);
+      if (!isValid) {
+        throw {
+          status: 400,
+          message: validate.errors,
+        };
+      }
+    } catch (error) {
+      res.status(error.status).json({ message: error.message });
     }
     let user = await User.findOne({ email });
     if (user) {
@@ -45,7 +66,8 @@ exports.signup = async (req, res) => {
     await newUser.save();
     res.status(201).json({ message: "User created" });
   } catch (error) {
-    console.log(error);
+    Sentry.captureException(error);
+    console.error(error);
     res.status(error.status).json({ message: error.message });
   }
 };
@@ -60,6 +82,7 @@ exports.github = async (req, res) => {
       };
     }
 
+    // added Sentry logging for axios request
     const { data } = await axios({
       method: "post",
       url: `https://github.com/login/oauth/access_token?client_id=${process.env.GITHUB_CLIENT_ID}&client_secret=${process.env.GITHUB_CLIENT_SECRET}&code=${code}`,
@@ -67,6 +90,7 @@ exports.github = async (req, res) => {
         accept: "application/json",
       },
     }).catch((error) => {
+      captureException(error);
       console.log(error.response.data.message);
       throw {
         status: 400,
@@ -112,11 +136,15 @@ exports.github = async (req, res) => {
       expiresIn: "1d",
     });
     res.json({ token });
+
   } catch (error) {
+    // Sentry Logging
+    Sentry.captureException(error);
     console.log(error?.response?.data ?? error?.message ?? error);
     res.status(error?.status ?? 500).json({ message: error?.message ?? error.toString() });
   }
 };
+
 
 exports.google = async (req, res) => {
   try {
