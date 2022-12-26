@@ -91,13 +91,13 @@ exports.github = async (req, res) => {
       },
     }).catch((error) => {
       captureException(error);
-      console.log(error.response.data.message);
+      logger.info(error.response.data.message);
       throw {
         status: 400,
         message: "Invalid code or something",
       };
     });
-    console.log("lalalala" + data);
+    logger.info("lalalala" + data);
     const { access_token } = data;
 
     const ghResponses = await Promise.all([
@@ -140,7 +140,7 @@ exports.github = async (req, res) => {
   } catch (error) {
     // Sentry Logging
     Sentry.captureException(error);
-    console.log(error?.response?.data ?? error?.message ?? error);
+    logger.info(error?.response?.data ?? error?.message ?? error);
     res.status(error?.status ?? 500).json({ message: error?.message ?? error.toString() });
   }
 };
@@ -168,7 +168,7 @@ exports.google = async (req, res) => {
           message: "Invalid access token",
         };
       });
-    console.log(googleUser);
+    logger.info(googleUser);
     const { id } = googleUser;
     let user = await User.findOne({ googleId: id });
     if (!user) {
@@ -190,7 +190,7 @@ exports.google = async (req, res) => {
     });
     res.json({ token });
   } catch (error) {
-    console.log(error);
+    logger.info(error);
     res.status(error?.status ?? 500).json({ message: error?.message ?? error.toString() });
   }
 };
@@ -224,7 +224,7 @@ exports.login = async (req, res) => {
     });
     res.json({ token });
   } catch (error) {
-    console.log(error?.data);
+    logger.info(error?.data);
     res.status(error?.status ?? 500).json({ message: error?.message ?? error.toString() });
   }
 };

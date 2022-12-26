@@ -36,7 +36,7 @@ export default function SocialProfileSimple() {
 				},
 			})
 			.then((res) => {
-				console.log(res.data);
+				logger.info(res.data);
 				setUser(res.data);
 				if (res.data?.user?.githubId) {
 					setIsGithubConnected(true);
@@ -44,7 +44,7 @@ export default function SocialProfileSimple() {
 					setIsGithubConnected(false);
 				}
 			})
-			.catch((err) => console.log(err));
+			.catch((err) => logger.info(err));
 	};
 
 	const handelGithubConnect = () => {
@@ -82,12 +82,12 @@ export default function SocialProfileSimple() {
 				},
 			})
 			.then((res) => {
-				console.log(res.data);
+				logger.info(res.data);
 				fetchUser();
 			})
 			.catch((err) => {
 				alert(err.response.data.message);
-				console.log(err);
+				logger.info(err);
 			});
 	};
 
@@ -103,12 +103,12 @@ export default function SocialProfileSimple() {
 				},
 			})
 			.then((res) => {
-				console.log(res.data);
+				logger.info(res.data);
 				fetchUser();
 			})
 			.catch((err) => {
 				alert(err.response.data.message);
-				console.log(err);
+				logger.info(err);
 			});
 	};
 
@@ -135,7 +135,7 @@ export default function SocialProfileSimple() {
 				<Tag>{user?.user.email} </Tag>
 
 				<Heading fontSize={"2xl"} fontFamily={"body"}>
-					Register / Deregister to socials
+					Connect / Remove OAuth Accounts
 				</Heading>
 				<Stack mt={8} spacing={4}>
 					{!isGithubConnected ? (

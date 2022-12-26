@@ -27,7 +27,7 @@ exports.isAuthenticated = (req, res, next) => {
 			};
 		}
 	} catch (error) {
-		console.log(error);
+		logger.info(error);
 		res.status(error.status ?? 500).json({
 			message: error.message ?? "something went wrong!",
 		});

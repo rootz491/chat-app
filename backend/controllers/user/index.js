@@ -16,13 +16,13 @@ exports.user = async (req, res) => {
 			user: user,
 		});
 	} catch (error) {
-		console.log(error);
+		logger.info(error);
 		res.status(error.status).json({ message: error.message });
 	}
 };
 
 exports.connectGithub = async (req, res) => {
-	console.log("hi");
+	logger.info("hi");
 	try {
 		const { code } = req.query;
 		if (!code) {
@@ -52,7 +52,7 @@ exports.connectGithub = async (req, res) => {
 				},
 			})
 			.catch((error) => {
-				console.log(error);
+				logger.info(error);
 				throw {
 					status: 400,
 					message: "weird error",
@@ -75,7 +75,7 @@ exports.connectGithub = async (req, res) => {
 			message: "Successfully connected to Github",
 		});
 	} catch (error) {
-		console.log(error);
+		logger.info(error);
 		res.status(error.status).json({ message: error.message });
 	}
 };
@@ -120,7 +120,7 @@ exports.disconnectGithub = async (req, res) => {
 			message: "Successfully disconnected from Github",
 		});
 	} catch (error) {
-		console.log(error);
+		logger.info(error);
 		res.status(error.status).json({ message: error.message });
 	}
 };
@@ -170,7 +170,7 @@ exports.connectGoogle = async (req, res) => {
 			message: "Successfully connected to Google",
 		});
 	} catch (error) {
-		console.log(error);
+		logger.info(error);
 		res.status(error.status).json({ message: error.message });
 	}
 };
@@ -215,7 +215,7 @@ exports.disconnectGoogle = async (req, res) => {
 			message: "Successfully disconnected from Google",
 		});
 	} catch (error) {
-		console.log(error);
+		logger.info(error);
 		res.status(error.status).json({ message: error.message });
 	}
 };
