@@ -1,5 +1,5 @@
 const mongoose = require("mongoose");
-const validator = require("mongoose-validator");amd 
+const validator = require("mongoose-validator"); 
 
 // Create User Schema
 const userSchema = new mongoose.Schema(
