@@ -1,45 +1,38 @@
-const User = require("../../schemas/user");
+const { userSchema } = require("../../schemas/user");
 const jwt = require("jsonwebtoken");
+const mongoose = require('mongoose');
 const axios = require("axios");
 const argon2 = require('argon2');
 const Sentry = require("@sentry/node");
 const mongooseJsonSchema = require('mongoose-schema-jsonschema');
-const ajv = require('ajv');
+const converter = require('json-schema-converter');
+const Ajv = require('ajv');
+const ajv = new Ajv();
+
+// Generate JSON Schema
+const userSchema  = ajv.addSchema(User, 'userSchema');
+const UserSchemaFinal = converter.convert(UserSchema);
 
 
-// Generate JSON Schema (CAUSES ERROR)
-//const userJsonSchema = mongooseJsonSchema(User.schema);
-
-// Compile JSON Schema (CAUSES ERROR)
-//const validator = new ajv();
-//const validate = validator.compile(userJsonSchema);
+const validate = (data) => {
+  const valid = ajv.validate(userSchemaFinal, data);
+  if (valid) {
+    console.log('Data matches the User schema');
+  }
+  return valid;
+}
 
 exports.signup = async (req, res) => {
   const saltRounds = 10;
   try {
     const { username, email, password } = req.body;
-    try {
       const isValid = validate(req.body);
       if (!isValid) {
         throw {
           status: 400,
-          message: validate.errors,
+          message: validate?.errors,
         };
       }
-    } catch (error) {
-      res.status(error.status).json({ message: error.message });
-    }
-    try {
-      const isValid = validate(req.body);
-      if (!isValid) {
-        throw {
-          status: 400,
-          message: validate.errors,
-        };
-      }
-    } catch (error) {
-      res.status(error.status).json({ message: error.message });
-    }
     let user = await User.findOne({ email });
     if (user) {
       throw {
@@ -68,7 +61,7 @@ exports.signup = async (req, res) => {
   } catch (error) {
     Sentry.captureException(error);
     console.error(error);
-    res.status(error.status).json({ message: error.message });
+    res.status(error?.status ?? 500).json({ message: error?.message ?? error.toString() });
   }
 };
 

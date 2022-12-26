@@ -21,13 +21,13 @@ function MyComponent({ code, state }) {
 			setTooLong(true);
 		}, 3000);
 		if (!code) {
-			logger.info("no code");
+			console.log("no code");
 			Route.push("/");
 		}
 		if (state === "connect") {
 			const token = localStorage.getItem("auth-token");
 			if (!token) {
-				logger.info("no token");
+				console.log("no token");
 				Route.push("/");
 			}
 			axios
@@ -44,15 +44,15 @@ function MyComponent({ code, state }) {
 				)
 				.then((response) => {
 					if (response?.ok) {
-						logger.info("success");
+						console.log("success");
 						Route.push("/settings");
 					} else {
-						logger.info("error while connecting github");
+						console.log("error while connecting github");
 						Route.push("/settings");
 					}
 				})
 				.catch((err) => {
-					logger.info(err);
+					console.log(err);
 					Route.push("/settings");
 				});
 		} else if (state === "login") {
@@ -60,17 +60,17 @@ function MyComponent({ code, state }) {
 				.get("/v1/auth/github?code=" + code)
 				.then((response) => {
 					if (response.status === 200) {
-						logger.info("success");
-						logger.info(response.data);
+						console.log("success");
+						console.log(response.data);
 						localStorage.setItem("auth-token", response.data.token);
 						Route.push("/settings");
 					} else {
-						logger.info("error while connecting github");
+						console.log("error while connecting github");
 						Route.push("/");
 					}
 				})
 				.catch((err) => {
-					logger.info(err);
+					console.log(err);
 					Route.push("/");
 				});
 		}

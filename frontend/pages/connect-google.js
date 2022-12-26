@@ -23,18 +23,18 @@ function MyComponent() {
 			axios
 				.get("/v1/auth/google?access_token=" + accessToken)
 				.then((res) => {
-					logger.info(res.data);
+					console.log(res.data);
 					if (res.status === 200) {
 						const { token } = res.data;
 						localStorage.setItem("auth-token", token);
 						Route.push("/settings");
 					} else {
-						logger.info(res.data);
+						console.log(res.data);
 						Route.push("/");
 					}
 				})
 				.catch((err) => {
-					logger.info(err);
+					console.log(err);
 					Route.push("/");
 				});
 		} else if (state === "connect") {
@@ -49,21 +49,21 @@ function MyComponent() {
 					}
 				)
 				.then((res) => {
-					logger.info(res.data);
+					console.log(res.data);
 					if (res.status === 200) {
 						//	TODO show success toast!
 						Route.push("/settings");
 					} else {
-						logger.info(res.data);
+						console.log(res.data);
 						Route.push("/");
 					}
 				})
 				.catch((err) => {
-					logger.info(err);
+					console.log(err);
 					Route.push("/");
 				});
 		} else {
-			logger.info("state is not login");
+			console.log("state is not login");
 			Route.push("/");
 		}
 	}, []);

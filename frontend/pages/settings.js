@@ -36,7 +36,7 @@ export default function SocialProfileSimple() {
 				},
 			})
 			.then((res) => {
-				logger.info(res.data);
+				console.log(res.data);
 				setUser(res.data);
 				if (res.data?.user?.githubId) {
 					setIsGithubConnected(true);
@@ -44,7 +44,7 @@ export default function SocialProfileSimple() {
 					setIsGithubConnected(false);
 				}
 			})
-			.catch((err) => logger.info(err));
+			.catch((err) =>	console.log(err));
 	};
 
 	const handelGithubConnect = () => {
@@ -82,12 +82,12 @@ export default function SocialProfileSimple() {
 				},
 			})
 			.then((res) => {
-				logger.info(res.data);
+				console.log(res.data);
 				fetchUser();
 			})
 			.catch((err) => {
 				alert(err.response.data.message);
-				logger.info(err);
+				console.log(err);
 			});
 	};
 
@@ -103,12 +103,12 @@ export default function SocialProfileSimple() {
 				},
 			})
 			.then((res) => {
-				logger.info(res.data);
+				console.log(res.data);
 				fetchUser();
 			})
 			.catch((err) => {
 				alert(err.response.data.message);
-				logger.info(err);
+				console.log(err);
 			});
 	};
 

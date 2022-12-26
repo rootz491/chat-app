@@ -1,9 +1,8 @@
 const express = require("express");
-const logger = require("morgan");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const Sentry = require('@sentry/node');
-const websocket = require('./websocket');
+const websocket = require('./sockets/websocket');
 const winston = require("winston");
 const helmet = require("helmet");
 
@@ -16,18 +15,20 @@ const logger = winston.createLogger({
 	level: "info",
 	format: winston.format.json(),
 	transports: [new winston.transports.Console()]
-  });
+});
+
+module.export = logger;
 
 // Connect to MongoDB
 const connectToMongo = async () => {
 	await mongoose.connect(process.env.MONGO_URI, {
-	  useNewUrlParser: true,
-	  useUnifiedTopology: true,
+		useNewUrlParser: true,
+		useUnifiedTopology: true,
 	});
 	logger.info("Connected to MongoDB");
-  };
-  
-  connectToMongo();
+};
+
+connectToMongo();
 
 // WS Server
 websocket.start();
@@ -44,9 +45,14 @@ app.use(helmet());
 
 // Middleware
 app.use(cors());
-app.use(logger("dev"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+app.use((req, res, next) => {
+	// TODO  make it better
+	logger?.info(`Request: ${req.method} ${req.url} ${req.ip}`);
+		next();
+	}
+)
 
 // Use Sentry Debugging
 app.use(Sentry.Handlers.requestHandler());

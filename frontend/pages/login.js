@@ -32,14 +32,14 @@ export default function SimpleCard() {
 	const handleSubmit = async () => {
 		try {
 			const response = await axios.post("/v1/auth/login", data);
-			logger.info(response);
+			console.log(response);
 			//saving the token from the response to the local storage
 			localStorage.setItem("auth-token", response.data.token);
 			//redirecting to the home page
 			Router.push("/settings");
 		} catch (error) {
 			alert(error.response.data.message);
-			logger.info(error);
+			console.log(error);
 		}
 	};
 

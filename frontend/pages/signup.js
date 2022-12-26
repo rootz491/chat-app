@@ -32,10 +32,10 @@ export default function SimpleCard() {
 		e.preventDefault();
 		try {
 			const response = await axios.post("/v1/auth/signup", data);
-			logger.info(response);
+			console.log(response);
 			router.push("/login");
 		} catch (error) {
-			logger.info(error);
+			console.log(error);
 		}
 	};
 
