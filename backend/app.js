@@ -20,7 +20,7 @@ const connectToMongo = async () => {
 		useNewUrlParser: true,
 		useUnifiedTopology: true,
 	});
-	console.log("Connected to MongoDB");
+	logger.info("Connected to MongoDB");
 };
 
 connectToMongo();
@@ -64,7 +64,7 @@ websocket();
 
 // Express Server
 app.listen(process.env.EXPRESS_PORT, async () => {
-	console.log("Express-Server started on port 8000");
+	logger.info("Express-Server started on port 8000");
 });
 
 //TODO:

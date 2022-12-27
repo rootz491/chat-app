@@ -4,8 +4,6 @@ const argon2 = require("argon2");
 const Sentry = require("@sentry/node");
 const User = require("../../schemas/user");
 const logger = require("../../utils/logger");
-// const Ajv = require("ajv");
-// const ajv = new Ajv();
 
 const validate = (data) => {
 	return true;
@@ -115,9 +113,13 @@ exports.github = async (req, res) => {
 				await user.save();
 			}
 		}
-		const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
-			expiresIn: "1d",
-		});
+		const token = jwt.sign(
+			{ id: user._id, username: user.username },
+			process.env.JWT_SECRET,
+			{
+				expiresIn: "1d",
+			}
+		);
 		res.json({ token });
 	} catch (error) {
 		// Sentry Logging
@@ -168,9 +170,13 @@ exports.google = async (req, res) => {
 			}
 		}
 
-		const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
-			expiresIn: "1d",
-		});
+		const token = jwt.sign(
+			{ id: user._id, username: user.username },
+			process.env.JWT_SECRET,
+			{
+				expiresIn: "1d",
+			}
+		);
 		res.json({ token });
 	} catch (error) {
 		logger.info(error?.response?.data ?? error?.message ?? error.toString());
@@ -204,9 +210,13 @@ exports.login = async (req, res) => {
 				message: "Invalid email or password",
 			};
 		}
-		const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
-			expiresIn: "1d",
-		});
+		const token = jwt.sign(
+			{ id: user._id, username: user.username },
+			process.env.JWT_SECRET,
+			{
+				expiresIn: "1d",
+			}
+		);
 		res.json({ token });
 	} catch (error) {
 		logger.info(error?.response?.data ?? error?.message ?? error.toString());
