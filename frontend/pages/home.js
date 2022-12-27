@@ -5,6 +5,7 @@ import {
 	Button,
 	Flex,
 	Grid,
+	Heading,
 	Image,
 	Input,
 	Text,
@@ -102,7 +103,8 @@ function ChatBox({ initialMessages = [], sendMessage, username }) {
 	};
 
 	return (
-		<Box>
+		<Box m={4} p={2} rounded={4} border="1px solid gray">
+			<Heading textAlign="center">Chat Box</Heading>
 			<Grid minH="50vh" placeContent={messages.length > 0 ? "start" : "center"}>
 				{messages.length > 0 ? (
 					messages.map((message, index) => (
@@ -115,7 +117,7 @@ function ChatBox({ initialMessages = [], sendMessage, username }) {
 					<Text>No messages yet</Text>
 				)}
 			</Grid>
-			<Flex px={4}>
+			<Flex mt={3}>
 				<Input
 					flex={1}
 					type="text"
