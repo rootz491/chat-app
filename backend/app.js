@@ -1,23 +1,16 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
-const Sentry = require('@sentry/node');
-const websocket = require('./sockets/websocket');
-const winston = require("winston");
+const Sentry = require("@sentry/node");
 const helmet = require("helmet");
-
-// Load Config & Sentry
-Sentry.init({ dsn: 'https://ea69acd8829843d1bae67b685a5e044a@o4504392106770432.ingest.sentry.io/4504392107753472' });
+const websocket = require("./sockets/websocket");
+const logger = require("./utils/logger");
 require("dotenv").config();
 
-// Initialize Logger
-const logger = winston.createLogger({
-	level: "info",
-	format: winston.format.json(),
-	transports: [new winston.transports.Console()]
+// Load Config & Sentry
+Sentry.init({
+	dsn: "https://ea69acd8829843d1bae67b685a5e044a@o4504392106770432.ingest.sentry.io/4504392107753472",
 });
-
-module.export = logger;
 
 // Connect to MongoDB
 const connectToMongo = async () => {
@@ -31,7 +24,7 @@ const connectToMongo = async () => {
 connectToMongo();
 
 // WS Server
-websocket.start();
+websocket();
 
 // Routes
 const indexRouter = require("./routes/index");
@@ -47,12 +40,11 @@ app.use(helmet());
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
-app.use((req, res, next) => {
+app.use((req, _, next) => {
 	// TODO  make it better
 	logger?.info(`Request: ${req.method} ${req.url} ${req.ip}`);
-		next();
-	}
-)
+	next();
+});
 
 // Use Sentry Debugging
 app.use(Sentry.Handlers.requestHandler());
@@ -70,16 +62,14 @@ app.listen(8000, async () => {
 	logger.info("Server started on port 8000");
 });
 
-
 //TODO:
 // password hash
 // password reset
 
-
 // gobj= {
-	//id : string
-	//name : string
-	//email : string
-	//picture : string
+//id : string
+//name : string
+//email : string
+//picture : string
 
 // }
