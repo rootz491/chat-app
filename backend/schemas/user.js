@@ -69,6 +69,11 @@ const userSchema = new mongoose.Schema(
 			default: "user",
 			enum: ["admin", "moderator", "user"],
 		},
+		wallets: [{
+			type: mongoose.Schema.Types.ObjectId,
+			ref: 'Wallet',
+			index: true,
+		  }],
 		// Token issued upon password reset
 		passwordResetToken: {
 			type: String,
