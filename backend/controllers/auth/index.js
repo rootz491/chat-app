@@ -1,4 +1,4 @@
-const { userSchema } = require("../../schemas/user");
+const User = require("../../schemas/user");
 const jwt = require("jsonwebtoken");
 const mongoose = require('mongoose');
 const axios = require("axios");
@@ -10,17 +10,16 @@ const Ajv = require('ajv');
 const ajv = new Ajv();
 
 // Generate JSON Schema
-const userSchema  = ajv.addSchema(User, 'userSchema');
-const UserSchemaFinal = converter.convert(UserSchema);
-
-
-const validate = (data) => {
-  const valid = ajv.validate(userSchemaFinal, data);
-  if (valid) {
-    console.log('Data matches the User schema');
-  }
-  return valid;
-}
+//const userSchema  = ajv.addSchema(User, 'userSchema');
+//const UserSchemaFinal = converter.convert(UserSchema);
+//
+//const validate = (data) => {
+//  const valid = ajv.validate(userSchemaFinal, data);
+//  if (valid) {
+//    console.log('Data matches the User schema');
+//  }
+ // return valid;
+//}
 
 exports.signup = async (req, res) => {
   const saltRounds = 10;
@@ -84,13 +83,13 @@ exports.github = async (req, res) => {
       },
     }).catch((error) => {
       captureException(error);
-      logger.info(error.response.data.message);
+      console.log(error.response.data.message);
       throw {
         status: 400,
         message: "Invalid code or something",
       };
     });
-    logger.info("lalalala" + data);
+    console.log("lalalala" + data);
     const { access_token } = data;
 
     const ghResponses = await Promise.all([
@@ -133,7 +132,7 @@ exports.github = async (req, res) => {
   } catch (error) {
     // Sentry Logging
     Sentry.captureException(error);
-    logger.info(error?.response?.data ?? error?.message ?? error);
+    console.log(error?.response?.data ?? error?.message ?? error);
     res.status(error?.status ?? 500).json({ message: error?.message ?? error.toString() });
   }
 };
@@ -161,7 +160,7 @@ exports.google = async (req, res) => {
           message: "Invalid access token",
         };
       });
-    logger.info(googleUser);
+    console.log(googleUser);
     const { id } = googleUser;
     let user = await User.findOne({ googleId: id });
     if (!user) {
@@ -183,7 +182,7 @@ exports.google = async (req, res) => {
     });
     res.json({ token });
   } catch (error) {
-    logger.info(error);
+    console.log(error);
     res.status(error?.status ?? 500).json({ message: error?.message ?? error.toString() });
   }
 };
@@ -217,7 +216,7 @@ exports.login = async (req, res) => {
     });
     res.json({ token });
   } catch (error) {
-    logger.info(error?.data);
+    console.log(error?.data);
     res.status(error?.status ?? 500).json({ message: error?.message ?? error.toString() });
   }
 };

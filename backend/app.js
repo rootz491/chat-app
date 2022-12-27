@@ -3,21 +3,25 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 const Sentry = require('@sentry/node');
 const websocket = require('./sockets/websocket');
-const winston = require("winston");
+// const winston = require("winston");
 const helmet = require("helmet");
 
 // Load Config & Sentry
 Sentry.init({ dsn: 'https://ea69acd8829843d1bae67b685a5e044a@o4504392106770432.ingest.sentry.io/4504392107753472' });
 require("dotenv").config();
 
-// Initialize Logger
-const logger = winston.createLogger({
-	level: "info",
-	format: winston.format.json(),
-	transports: [new winston.transports.Console()]
-});
 
-module.export = logger;
+// Initialize Logger
+//const logger = winston.createLogger({
+//	level: "info",
+//	format: winston.format.json(),
+//	transports: [new winston.transports.Console()]
+//});
+
+//module.export = logger;
+
+// Mongoose Settings
+mongoose.set('strictQuery', true);
 
 // Connect to MongoDB
 const connectToMongo = async () => {
@@ -25,13 +29,11 @@ const connectToMongo = async () => {
 		useNewUrlParser: true,
 		useUnifiedTopology: true,
 	});
-	logger.info("Connected to MongoDB");
+	console.log("Connected to MongoDB");
 };
 
 connectToMongo();
 
-// WS Server
-websocket.start();
 
 // Routes
 const indexRouter = require("./routes/index");
@@ -47,12 +49,12 @@ app.use(helmet());
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
-app.use((req, res, next) => {
-	// TODO  make it better
-	logger?.info(`Request: ${req.method} ${req.url} ${req.ip}`);
-		next();
-	}
-)
+//app.use((req, res, next) => {
+//	// TODO  make it better
+//	logger?.info(`Request: ${req.method} ${req.url} ${req.ip}`);
+//		next();
+//	}
+//)
 
 // Use Sentry Debugging
 app.use(Sentry.Handlers.requestHandler());
@@ -65,9 +67,12 @@ app.use("/v1/user", isAuthenticated, usersRouter);
 // Use Sentry Error Handler
 app.use(Sentry.Handlers.errorHandler());
 
+// WS Server
+websocket.start();
+
 // Express Server
-app.listen(8000, async () => {
-	logger.info("Server started on port 8000");
+app.listen(process.env.EXPRESS_PORT, async () => {
+	console.log("Express-Server started on port 8000");
 });
 
 
