@@ -1,20 +1,20 @@
 import {
-  Flex,
-  Box,
-  FormControl,
-  FormLabel,
-  Input,
-  Checkbox,
-  Stack,
-  Link,
-  Button,
-  Heading,
-  Text,
-  useColorModeValue,
-  Center,
-} from '@chakra-ui/react';
-import { FcGoogle } from 'react-icons/fc';
-import { BsGithub } from 'react-icons/bs';
+	Flex,
+	Box,
+	FormControl,
+	FormLabel,
+	Input,
+	Checkbox,
+	Stack,
+	Link,
+	Button,
+	Heading,
+	Text,
+	useColorModeValue,
+	Center,
+} from "@chakra-ui/react";
+import { FcGoogle } from "react-icons/fc";
+import { BsGithub } from "react-icons/bs";
 import React from "react";
 import axios from "axios";
 import Router from "next/router";

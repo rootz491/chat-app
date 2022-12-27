@@ -1,0 +1,5 @@
+Broom is a nodejs web-based application with chat and vote functions. 
+Users create an account, connect their NFT wallet and then can access corresponding communities to that NFT, 
+but only if the owner of the collection created a community already. In that community they have the ability 
+to partake in votes and their voting power is equal to the amount of NFTs from that collection they own. 
+There is also a global chat in the app and a per-community chat.
