@@ -8,7 +8,6 @@ const storeMessage = async (message) => {
 			case "text":
 				newMessage = new Message({
 					content: message.text,
-					username: message.username,
 					timestamp: new Date(),
 					author: message.author,
 					community: message.community,
@@ -18,7 +17,6 @@ const storeMessage = async (message) => {
 			case "gif":
 				newMessage = new Message({
 					gif: message.text,
-					username: message.username,
 					timestamp: new Date(),
 					author: message.author,
 					community: message.community,
@@ -28,7 +26,6 @@ const storeMessage = async (message) => {
 			case "image":
 				newMessage = new Message({
 					image: message.text,
-					username: message.username,
 					timestamp: new Date(),
 					author: message.author,
 					community: message.community,

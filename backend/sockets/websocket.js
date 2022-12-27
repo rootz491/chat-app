@@ -8,7 +8,8 @@ const wsport = process.env.WS_PORT;
 function start() {
 	logger.info(`WebSocket-Server listening on port ${wsport}`);
 
-	const io = new Server(httpServer, {
+	const io = new Server(wsport, {
+		rejectUnauthorized: false,
 		cors: {
 			origin: "*",
 		},
@@ -19,9 +20,9 @@ function start() {
 
 		socket.on("message", async (message) => {
 			try {
-				const parsedMessage = JSON.parse(message);
-				await storeMessage(parsedMessage);
-				socket.emit("message", "Message received!");
+				console.log({ message });
+				// globally echo to all clients
+				io.emit("message", message);
 			} catch (error) {
 				logger.info(error);
 			}
@@ -29,7 +30,8 @@ function start() {
 
 		// to emit to all clients
 		socket.on("join", (community) => {
-			console.log(community);
+			console.log({ community });
+			logger.info("A new user has joined the community!");
 			io.emit("message", "A new user has joined the community!");
 		});
 

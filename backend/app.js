@@ -12,18 +12,20 @@ Sentry.init({
 	dsn: "https://ea69acd8829843d1bae67b685a5e044a@o4504392106770432.ingest.sentry.io/4504392107753472",
 });
 
-mongoose.set('strictQuery', true);
+mongoose.set("strictQuery", true);
 
 // Connect to MongoDB
-const connectToMongo = async () => {
-	await mongoose.connect(process.env.MONGO_URI, {
+mongoose
+	.connect(process.env.MONGO_URI, {
 		useNewUrlParser: true,
 		useUnifiedTopology: true,
+	})
+	.then(() => {
+		logger.info("Connected to MongoDB");
+	})
+	.catch((error) => {
+		logger.error("Error connecting to MongoDB:", error.message);
 	});
-	logger.info("Connected to MongoDB");
-};
-
-connectToMongo();
 
 // WS Server
 websocket();
@@ -58,9 +60,6 @@ app.use("/v1/user", isAuthenticated, usersRouter);
 
 // Use Sentry Error Handler
 app.use(Sentry.Handlers.errorHandler());
-
-// WS Server
-websocket();
 
 // Express Server
 app.listen(process.env.EXPRESS_PORT, async () => {
