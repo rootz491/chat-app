@@ -16,11 +16,13 @@ function start() {
 	});
 
 	io.on("connection", function (socket) {
-		socket.emit("message", "Welcome to the broom server!");
+		socket.emit("message", "Welcome to the Broom server!");
 
 		socket.on("message", async (message) => {
 			try {
 				console.log({ message });
+        // store the message in the database
+				await storeMessage(message);
 				// globally echo to all clients
 				io.emit("message", message);
 			} catch (error) {

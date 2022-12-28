@@ -1,7 +1,8 @@
 const Message = require("../schemas/message");
 const logger = require("../utils/logger");
+const socket = require("socket.io");
 
-const storeMessage = async (message) => {
+const storeMessage = async (socket, message) => {
 	try {
 		let newMessage;
 		switch (message.type) {
@@ -36,7 +37,7 @@ const storeMessage = async (message) => {
 				throw new Error("Invalid message type");
 		}
 		await newMessage.save();
-		return newMessage;
+		socket.emit("message", newMessage);
 	} catch (error) {
 		logger.info(error);
 	}
