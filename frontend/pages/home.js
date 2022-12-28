@@ -13,6 +13,8 @@ import {
 } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { UserContext } from "../context/user";
+const jwt = require("jsonwebtoken");
+const SECRET_KEY = process.env.JWT_SECRET;
 
 const Home = () => {
 	const value = useContext(UserContext);
@@ -35,30 +37,21 @@ const Home = () => {
 
 	// Send message to server
 	const sendMessage = (message) => {
-		// TODO use this when websocket is implemented
-		// ws.send(
-		// 	JSON.stringify({
-		// 		message,
-		// 	})
-		// );
-	};
+		ws.send(
+		  JSON.stringify({
+			message,
+		  }),
+		  { headers: { Authorization: `Bearer ${token}` } }
+		);
+	  };
 
-	const getInitialMessages = () => {
-		// TODO use this when websocket is implemented
-		// axios
-		// 	.get("/messages", {
-		// 		headers: {
-		// 			Authorization: `Bearer ${token}`,
-		// 		},
-		// 	})
-		// 	.then((res) => {
-		// 		setInitialMessages(res.data);
-		// 	})
-		// 	.catch((err) => {
-		// 		console.log(err);
-		// 	});
-		return [];
-	};
+	 // const getInitialMessages = () => {
+		// Send a message to the server asking for the initial messages
+	//	socket.emit("getInitialMessages", (response) => {
+		  // Set the initial messages on the client side
+	//	  setInitialMessages(response.messages);
+	//	});
+	//  };
 
 	return (
 		<>
@@ -75,7 +68,7 @@ const Home = () => {
 				<Text>{username ?? "Anonymous"}</Text>
 			</Flex>
 			<ChatBox
-				initialMessages={getInitialMessages}
+				//initialMessages={getInitialMessages}
 				sendMessage={sendMessage}
 				// ws={ws}
 			/>
@@ -99,8 +92,8 @@ function ChatBox({ initialMessages = [], sendMessage, username }) {
 
 	const submitHandler = (e) => {
 		e.preventDefault();
-		sendMessage(message);
-	};
+		sendMessage(message, { headers: { Authorization: `Bearer ${token}` } });
+	  };
 
 	return (
 		<Box m={4} p={2} rounded={4} border="1px solid gray">

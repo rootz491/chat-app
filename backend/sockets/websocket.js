@@ -49,7 +49,14 @@ function start() {
         logger.info(error);
       }
     });
-
+    
+    socket.on("getInitialMessages", (callback) => {
+      // Get the initial messages from the database
+      const initialMessages = getMessagesFromDatabase();
+      // Send a response with the initial messages
+      callback({ messages: initialMessages });
+    });
+    
     // Emit to all clients
     socket.on("join", (community) => {
       console.log({ community });
