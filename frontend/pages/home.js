@@ -46,7 +46,7 @@ const Home = () => {
 			return;
 		}
 		socket.emit("message", {
-			type: "message",
+			type: "text",
 			text: message,
 		});
 	};

@@ -13,7 +13,7 @@ export default function Wallet() {
 		//	Solana Phantom listener
 		if (window["solana"]?.isPhantom) setPhantom(window["solana"]);
 
-		const token = localStorage.getItem("authToken");
+		const token = localStorage.getItem("auth-token");
 		if (token) fetchWallets(token);
 		else throw new Error("No token found");
 

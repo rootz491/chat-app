@@ -37,7 +37,7 @@ const storeMessage = async (message) => {
 		}
 		await newMessage.save();
 	} catch (error) {
-		logger.info(error);
+		logger.info(error.toString());
 	}
 };
 

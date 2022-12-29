@@ -26,7 +26,13 @@ function start() {
 		socket.on("message", async (message) => {
 			try {
 				// store the message in the database
-				await storeMessage(message);
+				await storeMessage({
+					text: message.text,
+					type: message.type,
+					author: socket?.userInfo?.id,
+					community: message?.communityId ?? null,
+					repliedTo: message?.repliedTo ?? null,
+				});
 				// globally echo to all clients
 				io.emit("message", {
 					text: message.text,
