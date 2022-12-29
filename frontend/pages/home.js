@@ -4,6 +4,7 @@ import { Flex, Image, Text } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { UserContext } from "../context/user";
 import ChatBox from "../components/chatbox";
+import Wallet from "../components/wallet";
 
 const Home = () => {
 	const value = useContext(UserContext);
@@ -72,6 +73,7 @@ const Home = () => {
 				<Text>{username}</Text>
 			</Flex>
 			<ChatBox chat={messages} sendMessage={sendMessage} />
+			<Wallet />
 		</>
 	);
 };

@@ -1,6 +1,5 @@
 const Message = require("../schemas/message");
 const logger = require("../utils/logger");
-const socket = require("socket.io");
 
 const storeMessage = async (message) => {
 	try {
