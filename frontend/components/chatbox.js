@@ -9,37 +9,9 @@ import {
 } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
 
-function ChatBox({ initialMessages = [], sendMessage, socket }) {
-	const [messages, setMessages] = useState(initialMessages);
+function ChatBox({ chat = [], sendMessage }) {
+	const [messages] = useState(chat);
 	const [message, setMessage] = useState("");
-
-	// Receive message from server
-	useEffect(() => {
-		// TODO use this when websocket is implemented
-		if (socket == null) {
-			return;
-		}
-		socket.on("message", (message) => {
-			console.log("Message received ", message);
-			messages.push({
-				id: messages.length + 1,
-				message: message?.text ?? message,
-				username: "test",
-			});
-			// setMessages([
-			// 	...messages,
-			// 	{
-			// 		id: messages.length + 1,
-			// 		message: message?.text ?? message,
-			// 		username: "test",
-			// 	},
-			// ]);
-		});
-
-		return () => {
-			socket.off("message");
-		};
-	}, [socket]);
 
 	const submitHandler = (e) => {
 		if (message === "") return;
@@ -47,13 +19,17 @@ function ChatBox({ initialMessages = [], sendMessage, socket }) {
 		setMessage("");
 	};
 
+	useEffect(() => {}, [messages]);
+
 	return (
 		<Box m={4} p={2} rounded={4} border="1px solid gray">
 			<Heading textAlign="center">Chat Box</Heading>
-			<Grid
+			<Flex
+				flexDirection="column"
 				w="full"
 				h="50vh"
-				placeContent={messages.length > 0 ? "start" : "center"}
+				alignItems="start"
+				justifyContent="start"
 				gap={4}
 				overflowY="scroll"
 			>
@@ -62,18 +38,23 @@ function ChatBox({ initialMessages = [], sendMessage, socket }) {
 						<Flex
 							key={index}
 							w="full"
+							height={10}
 							gap={4}
 							justify="space-around"
 							alignItems="baseline"
 						>
-							<Text>{message.username}</Text>
-							<Text>{message.message}</Text>
+							<Text color="teal.300">{message.username}</Text>
+							<Text w="85%" ml="auto">
+								{message.text}
+							</Text>
 						</Flex>
 					))
 				) : (
-					<Text>No messages yet</Text>
+					<Text textAlign="center" w="full" p="5">
+						No messages yet
+					</Text>
 				)}
-			</Grid>
+			</Flex>
 			<Flex mt={3}>
 				<Input
 					flex={1}

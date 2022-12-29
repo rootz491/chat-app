@@ -10,7 +10,6 @@ export const UserProvider = (props) => {
 		if (!token) return;
 		const payloadEncoded = token.split(".")[1];
         const payload = JSON.parse(window.atob(payloadEncoded));
-        console.log(payload);
 		setUser(payload);
 		// TODO get more user info using API call from here as well and store in another user state
 	}, []);
