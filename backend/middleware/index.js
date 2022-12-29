@@ -60,6 +60,7 @@ exports.isSocketAuthenticated = (socket, next) => {
 	try {
 		// verify the JWT in the query string
 		const { token } = socket.handshake.query;
+		// console.log({ token });
 		if (!token) {
 			logger.info("No token provided");
 			return socket.disconnect(true); // disconnect the socket if no token is provided
