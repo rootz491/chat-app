@@ -1,4 +1,5 @@
 import axios from "axios";
+import { io } from "socket.io-client";
 import React, { useContext, useEffect, useState } from "react";
 import {
 	Box,
@@ -13,34 +14,34 @@ import {
 } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { UserContext } from "../context/user";
+import ChatBox from "../components/chatbox";
 
 const Home = () => {
 	const value = useContext(UserContext);
 	const router = useRouter();
 	const [username, setUsername] = useState("");
 	const [token, setToken] = useState("");
+	const [socket, setSocket] = useState(null);
 
 	useEffect(() => {
 		setUsername(value[0]?.name);
 		setToken(localStorage.getItem("auth-token"));
+		if (token == null) router.push("/login");
+		const s = io("ws://localhost:8080");
+		s.emit("join", { username });
+		setSocket(s);
 	}, []);
-
-	// TODO initiate connection to websocket server
-	// Connect to WebSocket server
-	// const ws = useWebSocket("ws://localhost:8080", {
-	// 	headers: {
-	// 		Authorization: `Bearer ${token}`,
-	// 	},
-	// });
 
 	// Send message to server
 	const sendMessage = (message) => {
-		// TODO use this when websocket is implemented
-		// ws.send(
-		// 	JSON.stringify({
-		// 		message,
-		// 	})
-		// );
+		console.log("sending " + message);
+		if (socket == null) {
+			return;
+		}
+		socket.emit("message", {
+			type: "message",
+			text: message,
+		});
 	};
 
 	const getInitialMessages = () => {
@@ -74,62 +75,9 @@ const Home = () => {
 				/>
 				<Text>{username ?? "Anonymous"}</Text>
 			</Flex>
-			<ChatBox
-				initialMessages={getInitialMessages}
-				sendMessage={sendMessage}
-				// ws={ws}
-			/>
+			<ChatBox initialMessages={[]} sendMessage={sendMessage} socket={socket} />
 		</>
 	);
 };
-
-function ChatBox({ initialMessages = [], sendMessage, username }) {
-	const [messages, setMessages] = useState(initialMessages);
-	const [message, setMessage] = useState("");
-
-	// Receive message from server
-	useEffect(() => {
-		// TODO use this when websocket is implemented
-		// ws.onmessage = (event) => {
-		// 	const { username, message } = JSON.parse(event.data);
-		// 	// Add message to chatbox
-		// 	setMessages((messages) => [...messages, { username, message }]);
-		// };
-	}, []);
-
-	const submitHandler = (e) => {
-		e.preventDefault();
-		sendMessage(message);
-	};
-
-	return (
-		<Box m={4} p={2} rounded={4} border="1px solid gray">
-			<Heading textAlign="center">Chat Box</Heading>
-			<Grid minH="50vh" placeContent={messages.length > 0 ? "start" : "center"}>
-				{messages.length > 0 ? (
-					messages.map((message, index) => (
-						<div key={index}>
-							<p>{message.username}</p>
-							<p>{message.message}</p>
-						</div>
-					))
-				) : (
-					<Text>No messages yet</Text>
-				)}
-			</Grid>
-			<Flex mt={3}>
-				<Input
-					flex={1}
-					type="text"
-					value={message}
-					onChange={(e) => setMessage(e.target.value)}
-				/>
-				<Button colorScheme="teal" type="submit">
-					Send
-				</Button>
-			</Flex>
-		</Box>
-	);
-}
 
 export default Home;

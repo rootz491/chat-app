@@ -11,7 +11,6 @@ function MyApp({ Component, pageProps }) {
 		<UserProvider>
 			<ChakraProvider theme={theme}>
 				<CSSReset />
-				{/* usercontextProvider */}
 				<Component {...pageProps} />
 			</ChakraProvider>
 		</UserProvider>
