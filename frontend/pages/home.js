@@ -44,22 +44,13 @@ const Home = () => {
 		});
 	};
 
-	const getInitialMessages = () => {
-		// TODO use this when websocket is implemented
-		// axios
-		// 	.get("/messages", {
-		// 		headers: {
-		// 			Authorization: `Bearer ${token}`,
-		// 		},
-		// 	})
-		// 	.then((res) => {
-		// 		setInitialMessages(res.data);
-		// 	})
-		// 	.catch((err) => {
-		// 		console.log(err);
-		// 	});
-		return [];
-	};
+	// const getInitialMessages = () => {
+	// Send a message to the server asking for the initial messages
+	//	socket.emit("getInitialMessages", (response) => {
+	// Set the initial messages on the client side
+	//	  setInitialMessages(response.messages);
+	//	});
+	//  };
 
 	return (
 		<>
