@@ -32,6 +32,7 @@ websocket();
 // Routes
 const usersRouter = require("./routes/users");
 const authRouter = require("./routes/auth");
+const walletRouter = require("./routes/wallet");
 const { isAuthenticated } = require("./middleware");
 const routerStack = require("./utils/routerStack");
 
@@ -55,6 +56,9 @@ app.use(Sentry.Handlers.requestHandler());
 // Routes
 app.use("/v1/auth", authRouter);
 app.use("/v1/user", isAuthenticated, usersRouter);
+app.use("/v1/wallet", isAuthenticated, walletRouter);
+
+
 
 // Use Sentry Error Handler
 app.use(Sentry.Handlers.errorHandler());

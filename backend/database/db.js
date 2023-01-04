@@ -12,7 +12,7 @@ const messageFieldMap = {
   const storeMessage = async (message) => {
 	try {
 	  const newMessage = new Message({
-		[messageFieldMap[message.type]]: message.text,
+		[messageFieldMap[message.type]]: message.text,		//	sus
 		timestamp: new Date(),
 		author: message.author,
 		community: message.community,

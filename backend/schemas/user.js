@@ -73,7 +73,7 @@ const userSchema = new mongoose.Schema(
 			type: mongoose.Schema.Types.ObjectId,
 			ref: 'Wallet',
 			index: true,
-		  }],
+		}],
 		// Token issued upon password reset
 		passwordResetToken: {
 			type: String,
